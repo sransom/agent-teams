@@ -101,18 +101,20 @@ Output: a `.formula.json` in `~/.beads/formulas/` that `/spawn` can run.
 | judge          | sonnet | Pass/fail gate on implementer output           |
 | test-writer    | haiku  | Write colocated tests                          |
 | code-reviewer  | sonnet | P1/P2/P3 report on a diff                      |
+| plan-checker   | sonnet | Verify a plan is concrete before dispatch      |
 
 Model names are family aliases (`haiku` / `sonnet` / `opus`) so they track Claude Code's latest defaults. Pin to a snapshot (e.g. `claude-sonnet-4-6`) if you want reproducibility.
 
 ### Formulas (`~/.beads/formulas/`)
 
-| Formula       | What it does                                                                                                  |
-|---------------|---------------------------------------------------------------------------------------------------------------|
-| full-team     | Ship end-to-end: explorer → implementer arms → judge → test + review → integrate                              |
-| lite-team     | Same as full-team, minus test-writer. For prototypes.                                                         |
-| code-review   | Parallel specialist reviewers. Triage picks reviewers per file type; aggregate dedupes findings.              |
-| implement-arm | Child formula bonded by the explorer. One implementer, one slice of a feature.                                |
-| review-arm    | Child formula bonded by triage. One specialist reviewer.                                                      |
+| Formula          | What it does                                                                                                  |
+|------------------|---------------------------------------------------------------------------------------------------------------|
+| full-team        | Ship end-to-end: explorer → implementer arms → judge → test + review → integrate                              |
+| lite-team        | Same as full-team, minus test-writer. For prototypes.                                                         |
+| plan-first-team  | full-team with a plan-checker prepended + checkbox/progress-log update at integrate. For multi-milestone plans. |
+| code-review      | Parallel specialist reviewers. Triage picks reviewers per file type; aggregate dedupes findings.              |
+| implement-arm    | Child formula bonded by the explorer. One implementer, one slice of a feature.                                |
+| review-arm       | Child formula bonded by triage. One specialist reviewer.                                                      |
 
 ---
 
@@ -176,6 +178,7 @@ Override with `--profile <name>` if detection is wrong, or drop your own `.md` f
 - [`docs/model-routing.md`](docs/model-routing.md) — which models for which roles and why
 - [`docs/writing-formulas.md`](docs/writing-formulas.md) — create custom formulas by hand or with `/build-team`
 - [`docs/writing-agents.md`](docs/writing-agents.md) — define custom agents that plug into formulas
+- [`docs/writing-plans.md`](docs/writing-plans.md) — how to write decomposable plans + checkbox/progress-log convention
 - [`profiles/README.md`](profiles/README.md) — stack profiles explained
 
 ---

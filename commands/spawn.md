@@ -293,23 +293,65 @@ ${LINT_CMD} && ${BUILD_CMD} && ${TEST_CMD}
 # 4. Fix P1 findings from reviewers
 # (apply fixes, commit)
 
-# 5. Push
+# 5. If the formula has a plan-update step OR this was mol-plan-first-team:
+#    update the plan file to reflect what shipped. See "Plan update" below.
+
+# 6. Push
 git push origin integration/{team}
 
-# 4. Merge back to base branch
+# 7. Merge back to base branch
 git checkout {base_branch}
 git merge integration/{team} --no-edit
 git push origin {base_branch}
 
-# 5. Clean up
+# 8. Clean up
 bd worktree list               # see what exists
 bd worktree remove {name}      # repeat per worktree
 git branch -D agent/{team}/* integration/{team}
 
-# 6. Close remaining issues
+# 9. Close remaining issues
 bd list --status=open | grep {team}
 bd close {id1} {id2} ...
 ```
+
+#### Plan update (mol-plan-first-team and similar)
+
+When the formula has a `plan-update` step — or when a `plan` var was passed and the plan file uses `- [ ]` checkbox milestones — tick off the checkboxes that got done before pushing integration.
+
+**Identifying what shipped.** Read the arm reports (each implementer returns `Done: implementer — N files changed. <summary>`). Read `git diff {base_branch}...integration/{team}`. Match changed files + behaviors back to milestones in the plan.
+
+**Ticking the boxes.** In-place edit on the plan file:
+
+```bash
+PLAN="{plan-var-value-or-refined-sidecar}"
+# Tick a specific milestone:
+sed -i '' 's/- \[ \] Add in-memory todos store/- [x] Add in-memory todos store/' "$PLAN"
+```
+
+Only tick milestones that are **actually complete** in the merged diff. If a milestone is partially done (e.g. "Add auth with rotation" where only the base auth shipped), leave it unchecked and note the partial work in the progress log.
+
+**Progress log.** Append a section to the plan file:
+
+```markdown
+## Progress log
+
+### 2026-04-18 — team `todos` (arms: api, ui)
+- [x] In-memory todos store + REST API (arm: api) — commits 5e4f8d0
+- [x] /todos page UI (arm: ui) — commits 27eb536, b2db714
+- Test coverage: 16 unit tests for store (arm: test-writer) — commit 8df8a46
+- Reviewer findings: 2 P1, 4 P2 (not yet resolved — tracked separately)
+```
+
+**Commit the plan update** on the integration branch so it's part of what ships:
+
+```bash
+git add "$PLAN"
+git commit -m "docs(plan): tick {team} milestones"
+```
+
+**What if the plan lives outside the repo** (e.g. `~/.claude/plans/foo.md`)? Still tick the boxes in place, but don't commit — just report to the user that the file was updated.
+
+**What if the plan is unchanged-format prose** (no checkboxes)? Skip the tick step. Still append the progress log if the user explicitly asked for tracking.
 
 Final report:
 
