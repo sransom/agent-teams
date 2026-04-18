@@ -85,7 +85,7 @@ Done: sql-migration-reviewer — BLOCK — 3 issues: 1 P1, 1 P2, 1 P3
 
 Drop this file at `~/.claude/agents/sql-migration-reviewer.md`. Then either:
 
-**Option A — add a step to an existing formula.** Edit `~/.beads/formulas/full-team.formula.json` to add a parallel review step that runs alongside `review` and `codex-review`:
+**Option A — add a step to an existing formula.** Edit `~/.beads/formulas/mol-full-team.formula.json` to add a parallel review step that runs alongside `review` and `codex-review`:
 
 ```json
 {

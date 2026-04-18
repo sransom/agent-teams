@@ -1,5 +1,5 @@
 {
-  "formula": "full-team",
+  "formula": "mol-full-team",
   "description": "Ship a feature end-to-end with a parallel agent team. An explorer splits the work into non-overlapping implementer arms, a judge gates merges, then a test-writer and code-reviewers run in parallel before the orchestrator integrates and pushes. Use for production work.",
   "version": 1,
   "type": "convoy",

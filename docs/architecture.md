@@ -59,19 +59,42 @@ The explorer is a special agent. It does two things in sequence:
 - **Sequential arms** (`bd dep add B A`) when arm B imports or queries something arm A produces (e.g. a migration creates a table that the API queries).
 - **Single arm** when the feature is small (≤5 files, one concern).
 
-For each arm, the explorer calls `bd mol bond implement-arm {parent}` with file boundaries, lint command, and notes. This bonds a child formula into the parent's DAG — a molecule bonded inside another molecule.
+For each arm, the explorer calls `bd mol bond mol-implement-arm {root-epic-id}` with file boundaries, lint command, and notes. This bonds a child formula into the root epic — a molecule bonded inside another molecule.
+
+Note: beads' `bd mol bond` command only resolves formula names that start with `mol-`. The `mol-implement-arm` name matches the filename `mol-implement-arm.formula.json` in `~/.beads/formulas/`. The same rule applies to any custom formulas you add — if you want to use them with `bd mol bond`, give them a `mol-` prefixed filename.
 
 After bonding, the explorer closes its own issue. beads now contains an expanded graph where the judge step depends on `all-children` — which includes the dynamically bonded implementer arms.
 
 ---
 
-## Why `waits_for: all-children`
+## Why `waits_for: all-children` (and who enforces it)
 
 Most workflow engines require a static DAG. agent-teams needs dynamic fanout: the explorer doesn't know at pour time how many arms there will be, because that depends on what it finds.
 
-`waits_for: all-children` is the beads idiom for "wait until everything bonded under the parent is closed." The judge can't run until every implementer arm the explorer created is done.
+`waits_for: all-children` on a step is the formula's declaration that "this step shouldn't run until every issue that gets bonded under the parent epic is closed." The judge can't run until every implementer arm the explorer created is done.
 
-This is why formulas that use the explorer pattern always have the gating step (judge, aggregate) set to `waits_for: all-children`.
+**Important — beads does NOT enforce this automatically.** `bd ready` will return a step with `waits_for: all-children` as ready immediately after pour, even though no children have been bonded yet. The declaration is a signal to the orchestrator, not a beads-level blocker.
+
+The orchestrator (the Claude Code lead running `/spawn`) is responsible for:
+
+1. Recognizing when a step has `waits_for: all-children` and **not** claiming it from `bd ready`
+2. Dispatching the upstream decomposing step (explorer, triage) first
+3. Waiting for all bonded children to close before claiming the gated step
+
+This is why `/spawn.md` has a "CRITICAL: enforce `waits_for: all-children` yourself" section. If the orchestrator skips this check, the judge will fire on an empty tree.
+
+## How bonding works in practice
+
+When the explorer decides to split work into N arms, it bonds one `mol-implement-arm` per arm **under the root epic** (not under the judge):
+
+```bash
+bd mol bond mol-implement-arm {ROOT_EPIC_ID} \
+  --var team=auth-refactor --var arm=migration ...
+```
+
+Each bond creates a sub-epic `implement-arm` with one child task `[team] implement-{arm}: {feature}`. These become siblings of the judge under the root epic, not children of the judge.
+
+A quirk of beads: `bd mol bond` only resolves formula names that **start with `mol-`**. Formulas without the prefix (e.g. `bd mol bond implement-arm ...`) fail with "not found". That's why every formula in `~/.beads/formulas/` uses the `mol-*.formula.json` convention.
 
 ---
 

@@ -1,5 +1,5 @@
 {
-  "formula": "lite-team",
+  "formula": "mol-lite-team",
   "description": "Same parallel agent team as full-team, minus the test-writer step. Faster for prototypes, spikes, and throwaway code where you trust CI or a human to cover tests later.",
   "version": 1,
   "type": "convoy",

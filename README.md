@@ -62,7 +62,7 @@ Shortcuts:
 
 ```bash
 /spawn my-auth-refactor                                 # full-team, team=arg
-/spawn --formula lite-team                              # pick formula, prompt for vars
+/spawn --formula mol-lite-team                          # pick formula, prompt for vars
 /spawn --from-plan ~/plans/migrate-auth.md              # infer feature + plan from file
 /spawn --var implementer_model=gpt-4o-mini              # ~3x cheaper (needs codex CLI)
 /spawn --resume                                         # pick from teams in flight

@@ -1,5 +1,5 @@
 {
-  "formula": "implement-arm",
+  "formula": "mol-implement-arm",
   "description": "Child formula: one implementer working on one slice of a larger feature. The explorer bonds one of these per arm it identifies. Each arm owns a non-overlapping set of files and commits in its own worktree. Not meant to be invoked directly — use full-team or lite-team.",
   "version": 1,
   "type": "convoy",

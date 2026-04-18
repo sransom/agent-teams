@@ -201,7 +201,9 @@ Minimal 2-step example:
 }
 ```
 
-Save as `~/.beads/formulas/plan-and-ship.formula.json` and `/spawn --formula plan-and-ship`.
+Save as `~/.beads/formulas/mol-plan-and-ship.formula.json` and run `/spawn --formula mol-plan-and-ship`.
+
+Don't forget the `mol-` filename prefix. beads' `bd mol bond` command only resolves formula names that start with `mol-` (the bond example in this doc's sibling formulas depends on this). You can keep the `formula` field inside the JSON short or prefixed — `bd` doesn't care — but the filename must have the prefix.
 
 ---
 
@@ -220,7 +222,7 @@ Structurally they're identical to top-level formulas. The only difference is the
 Use `--dry-run` to pour without dispatching:
 
 ```bash
-/spawn --formula my-new-formula --dry-run
+/spawn --formula mol-my-new-formula --dry-run
 ```
 
 This pours the molecule, runs `bd graph` to show the DAG, and stops. If the graph looks wrong (wrong dependencies, missing `all-children`), fix the JSON and re-run. Tear down with:

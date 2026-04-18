@@ -1,5 +1,5 @@
 {
-  "formula": "code-review",
+  "formula": "mol-code-review",
   "description": "Review a PR or branch in parallel with specialist reviewers. A triage step reads the diff, picks the right reviewers for each file type, runs them in parallel, and aggregates findings into a single P1/P2/P3 report (optionally posted as a PR comment).",
   "version": 1,
   "type": "convoy",

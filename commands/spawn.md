@@ -12,7 +12,7 @@ Explorer maps the codebase, decomposes work into implementer arms with non-overl
 /spawn                                                      # interactive picker
 /spawn {team-name}                                          # full-team, team=arg
 /spawn --formula {name}                                     # pick formula by name
-/spawn --formula code-review 123                            # formula + first positional var
+/spawn --formula mol-code-review 123                        # formula + first positional var
 /spawn --var feature="auth migration" --var base_branch=main  # var passthrough
 /spawn --from-plan ~/plans/my-plan.md                       # feature + plan from file
 /spawn --resume                                             # pick from active teams in beads
@@ -75,7 +75,7 @@ Which one? >
 Read the selected formula's `vars`. For each variable, resolve its value in this order (first match wins):
 
 1. **`--var key=value` passthrough** from the invocation
-2. **Positional arg** — `/spawn {team}` or `/spawn --formula code-review 123` maps positionals onto the formula's vars in declaration order (skipping any already set by `--var`)
+2. **Positional arg** — `/spawn {team}` or `/spawn --formula mol-code-review 123` maps positionals onto the formula's vars in declaration order (skipping any already set by `--var`)
 3. **`--from-plan <file>` inference** — sets `plan` to the file path; if `feature` is still unset, uses the first H1 (`# ...`) heading as the feature name. User confirms.
 4. **Auto-detect**:
    - `repo` → `basename "$(pwd)"`
@@ -176,6 +176,34 @@ Walk the formula's step DAG. For each ready task:
 3. **Judge retry loop** (max 3 attempts): on `VERDICT: FAIL`, reopen the failing arm (`bd reopen {id}`), relay findings verbatim, re-dispatch. Escalate to the user after attempt 3.
 
 4. **Parallel dispatch**: if multiple tasks in `bd ready` share the same `needs` set, spawn them in a **single message** so they run in parallel.
+
+#### CRITICAL: enforce `waits_for: all-children` yourself
+
+`bd ready` returns the judge (or any step with `waits_for: all-children`) as ready **immediately** — beads does NOT block it until bonded children exist and close. That's an orchestrator responsibility.
+
+When the formula declares `waits_for: all-children` on a step, you must:
+
+1. **Do not claim that step from `bd ready` directly.** Skip it and pick another ready task.
+2. Dispatch the upstream decomposing step (explorer / triage). That step bonds child molecules via `bd mol bond mol-child-formula {root-epic-id}`.
+3. After the decomposing step closes, verify **all bonded children are closed** before claiming the gated step:
+   ```bash
+   bd list --status=open --parent {root-epic-id} --json | jq length
+   # When this returns 1 (just the gated step itself), you can proceed.
+   ```
+4. Only then claim and dispatch the gated step.
+
+Getting this wrong means dispatching the judge before any arms have been built — the judge will have nothing to judge and will either PASS vacuously or FAIL on missing work. Both are wrong outcomes.
+
+#### Bond target for dynamic arms
+
+When the explorer (or triage) bonds child molecules, target them at the **root epic**, not at the gated step:
+
+```bash
+bd mol bond mol-implement-arm {ROOT_EPIC_ID} \
+  --var team=... --var arm=... --var feature=... ...
+```
+
+beads blocks `mol-*` prefixed formula names for bond resolution. If you renamed a formula without the prefix, `bd mol bond` will fail with "not found (not an issue ID or formula name)". Our shipped formulas all use the `mol-` prefix in their filenames for this reason.
 
 ### Step 6 — Integration
 

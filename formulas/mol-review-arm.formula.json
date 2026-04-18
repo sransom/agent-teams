@@ -1,5 +1,5 @@
 {
-  "formula": "review-arm",
+  "formula": "mol-review-arm",
   "description": "Child formula: one specialist reviewer (e.g. security, TypeScript, SQL) focused on a subset of changed files. The triage step of code-review bonds one of these per matched specialist. Not meant to be invoked directly — use code-review.",
   "version": 1,
   "type": "convoy",
