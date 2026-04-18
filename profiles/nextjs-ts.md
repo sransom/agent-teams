@@ -6,12 +6,21 @@ Next.js (any version) + TypeScript. Detected by `package.json` containing `"next
 
 ```bash
 LINT="npm run lint"          # fallback: pnpm lint, yarn lint
+LINT_CHANGED_FILES="npx eslint --no-error-on-unmatched-pattern"   # pass files as args
 TEST="npm test"              # if package.json has a "test" script
 BUILD="npm run build"
 TYPECHECK="npx tsc --noEmit" # optional sanity check
 ```
 
 Detect the package manager from lockfiles: `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, otherwise npm.
+
+**Lint scope**: at integration time, prefer `LINT_CHANGED_FILES` applied to only the files the team changed. Next.js projects commonly have `node_modules/next/dist/docs/**` TypeScript files that aren't in the project's `.eslintignore` and generate hundreds of phantom errors when you run the default `npm run lint` on the whole repo. Scope to changed files:
+
+```bash
+git diff --name-only {base}...integration/{team} | \
+  grep -E '\.(ts|tsx|js|jsx|mjs)$' | \
+  xargs -r npx eslint --no-error-on-unmatched-pattern
+```
 
 ## Test runner detection
 

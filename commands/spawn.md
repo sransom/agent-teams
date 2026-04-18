@@ -314,9 +314,23 @@ Do NOT re-pour. Proceed directly to Step 5 (orchestrate) using `bd ready` as the
 Walk the formula's step DAG. For each ready task:
 
 1. **Create the worktree** (if it's a task that needs one):
+
    ```bash
+   # When branching off the default base (main, develop, etc.):
    bd worktree create {team}-{step-id} --branch agent/{team}/{step-id}
+
+   # When branching off a non-default base (e.g. test-writer and reviewers
+   # need integration/{team} as their base, NOT main), use raw git — bd worktree
+   # has no --from flag:
+   git worktree add -b agent/{team}/{step-id} \
+     /path/to/{team}-{step-id} \
+     integration/{team}
+
+   # Either way, silence the "0755 permissions" warning beads emits:
+   chmod 700 /path/to/{team}-{step-id}/.beads 2>/dev/null || true
    ```
+
+   **Rule of thumb:** implementer arms branch off the default base. Test-writer and code-review branch off `integration/{team}` (they need the merged arm code to test against / review).
 
 2. **Dispatch the agent**. Read the `labels` for model routing:
    - `agent:<name>` → which subagent to spawn
@@ -459,8 +473,27 @@ git merge agent/{team}/test-writer     # if present
 #    - Go: go mod download
 #    Use the stack profile's convention; skip for stacks with no separate install step.
 
-# 3. Verify build + tests pass on integration branch using the profile's commands
-${LINT_CMD} && ${BUILD_CMD} && ${TEST_CMD}
+# 3. Verify build + tests pass on integration branch using the profile's commands.
+#
+#    LINT MUST BE SCOPED TO CHANGED FILES — don't lint the whole repo.
+#    Many projects have vendor dirs (node_modules/**, vendor/**, .venv/**)
+#    that are not excluded by default linter config and produce hundreds
+#    of phantom errors. Lint only what this team changed:
+#
+CHANGED_FILES=$(git diff --name-only {base_branch}...integration/{team} | \
+  grep -E '\.(ts|tsx|js|jsx|py|go|rs|swift)$' || true)
+
+if [ -n "$CHANGED_FILES" ]; then
+  # Stack-specific — pick one:
+  # JS/TS:    echo "$CHANGED_FILES" | xargs -r pnpm exec eslint --no-error-on-unmatched-pattern
+  # Python:   echo "$CHANGED_FILES" | xargs -r ruff check
+  # Go:       go vet ./...                        # go scopes by package, not file
+  # Rust:     cargo clippy --package $PKG         # rust scopes by crate
+  echo "$CHANGED_FILES" | xargs -r ${LINT_CMD_CHANGED_FILES}
+fi
+
+# BUILD and TEST run at project scope — they need full context.
+${BUILD_CMD} && ${TEST_CMD}
 
 # 4. Fix P1 findings from reviewers
 # (apply fixes, commit)
