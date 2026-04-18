@@ -42,7 +42,7 @@
       "id": "plan-check",
       "title": "[{{team}}] plan-check: verify {{plan}} is ready to execute",
       "type": "task",
-      "description": "Read the plan at {{plan}}. Check for concrete problem statement, verifiable milestones (prefer - [ ] checkboxes), specific file paths and signatures, missing pieces (error handling, tests, auth), and stack fit. Produce PLAN_VERDICT: PASS / REFINED / NEEDS_REVISION. On REFINED, write {{plan}}.refined.md. On NEEDS_REVISION, stop the run and return to user.",
+      "description": "Read the plan at {{plan}}. Check for concrete problem statement, verifiable milestones (prefer - [ ] checkboxes), specific file paths and signatures, missing pieces (error handling, tests, auth), and stack fit. Produce PLAN_VERDICT: PASS / REFINED / NEEDS_REVISION. On REFINED, write {{plan}}.refined.md. On NEEDS_REVISION, stop the run and return to user. SHORTCUT: if {{plan}} ends in .refined.md, return PLAN_VERDICT: PASS immediately without re-checking — it's the output of a prior plan-check and re-refining is wasted work.",
       "labels": [
         "agent:plan-checker",
         "model:sonnet"

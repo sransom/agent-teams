@@ -328,6 +328,36 @@ Walk the formula's step DAG. For each ready task:
 
 4. **Parallel dispatch**: if multiple tasks in `bd ready` share the same `needs` set, spawn them in a **single message** so they run in parallel.
 
+#### Scope bd queries to your root epic
+
+`bd ready` surfaces work from ALL open teams in the repo's beads database, including stale tasks from prior runs. Every `/spawn` invocation should capture the root epic ID at pour time and use it as the single source of truth for what's "your" work.
+
+```bash
+# At pour time, capture the root ID
+ROOT_EPIC_ID=$(bd mol pour <formula> --var team=<team> ... | grep -oE 'agent-teams[^ ]*-mol-[a-z0-9]+' | head -1)
+
+# Then, instead of `bd ready`, list your epic's children
+bd show "$ROOT_EPIC_ID" | awk '/↳/ {print $2}'    # all child IDs
+bd show "$ROOT_EPIC_ID" --json | jq -r '.children[] | select(.status=="open") | .id'
+```
+
+Always filter by root epic before claiming work. Never dispatch a task just because `bd ready` surfaced it — confirm it belongs to your team first.
+
+#### Dispatch pattern for a single task
+
+Copy this block per task. It claims, dispatches, and closes in sequence — one code block per task, not six:
+
+```bash
+ID={task-id}
+bd update "$ID" --claim --status in_progress
+# Dispatch the agent (subagent call goes here, see labels for agent: and model:)
+# On agent success:
+bd close "$ID" --reason "{one-line summary}"
+# On agent failure: `bd update "$ID" --status open` and surface the error
+```
+
+For read-only agents (explorer, code-reviewer) the orchestrator closes on their behalf after executing their recommended commands.
+
 #### Read-only agents cannot close their own beads issues or bond children
 
 Some agents (explorer, code-reviewer) ship without the `Bash` tool — they're read-only by design. They cannot run `bd close`, `bd mol bond`, or any shell commands. When the orchestrator dispatches a read-only agent:
@@ -371,6 +401,33 @@ bd mol bond mol-implement-arm {ROOT_EPIC_ID} \
 ```
 
 beads blocks `mol-*` prefixed formula names for bond resolution. If you renamed a formula without the prefix, `bd mol bond` will fail with "not found (not an issue ID or formula name)". Our shipped formulas all use the `mol-` prefix in their filenames for this reason.
+
+#### Pass exact bond vars to the explorer
+
+Variable names drift between what the explorer emits and what `mol-implement-arm.formula.json` accepts (e.g. `files_owned` vs. `files`). This costs 1-2 failed bond attempts per run.
+
+Before dispatching the explorer, extract the authoritative var list from the child formula:
+
+```bash
+BOND_VARS=$(jq -r '.vars | to_entries | map(
+  "\(.key)" + (if .value.required then " (required)" else " (optional, default: \(.value.default // "none"))" end)
+) | join("\n  - ")' ~/.beads/formulas/mol-implement-arm.formula.json)
+```
+
+Include this in the explorer's spawn prompt as:
+
+```
+Root epic ID:       {ROOT_EPIC_ID}
+Team:               {TEAM}
+Feature:            {FEATURE}
+Repo:               {REPO}
+Implementer model:  {IMPLEMENTER_MODEL}
+
+Bond vars for mol-implement-arm (use EXACTLY these names in every bond_command):
+  - {BOND_VARS output}
+```
+
+The explorer then produces bond commands whose `--var` names match the formula verbatim, with every required var present. No more silent renames.
 
 #### Seed dependent arms from their upstream
 

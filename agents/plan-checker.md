@@ -27,6 +27,19 @@ The orchestrator provides:
 4. **Write refined sidecar?** (yes/no — default yes). If yes, you write `plan.refined.md` next to the original.
 5. **Beads issue ID** to close when done (the orchestrator will close it for you if you're read-only — but you have Edit, so you close it yourself via the orchestrator's instructions).
 
+## Fast-path: plan is already a `.refined.md` sidecar
+
+If the plan file path ends in `.refined.md`, it's the output of a prior plan-check. Return immediately:
+
+```
+PLAN_VERDICT: PASS
+
+This plan is already a refined sidecar (from a prior plan-check run).
+Skipping re-verification. Original plan: {path without .refined.md}
+```
+
+Don't write another sidecar, don't re-flag gaps — just return. The orchestrator will proceed to explore.
+
 ## Checks
 
 ### 1. Problem statement
