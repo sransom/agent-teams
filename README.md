@@ -211,6 +211,14 @@ If the merge conflicts, that's a real decomposition problem — re-think the arm
 
 beads doesn't enforce `waits_for: all-children` automatically — it's a declaration the orchestrator reads and acts on. The orchestrator should dispatch the explorer first, execute its bond commands, dispatch the arms by ID, wait for them to close, then claim the judge. See `commands/spawn.md` Step 5.
 
+### Test runner (vitest) not installed at project root after test-writer runs
+
+The test-writer installs vitest in its own worktree. When the orchestrator merges the test-writer branch into `integration/{team}` and then into `main`, the package.json + pnpm-lock.yaml changes come along, but `node_modules/` does NOT. Run `pnpm install` (or `npm install`) at the project root after merging test-writer's branch — the integrate step should do this automatically. If `npm run build` fails with `Cannot find module 'vitest/config'`, that's the symptom.
+
+### Codex CLI rejects `gpt-4o-mini` with a 400 error
+
+Some Codex CLI installs only accept the model their current subscription allows. If `gpt-4o-mini` fails, try `gpt-5-mini` or `gpt-5.4-mini`. The codex-reviewer step in our formulas uses `gpt-4o-mini` by default, but it's informational only — failure there doesn't block integration.
+
 ---
 
 ## License

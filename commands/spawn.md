@@ -243,10 +243,21 @@ git checkout -b integration/{team}
 git merge agent/{team}/impl-{arm}      # repeat per arm
 git merge agent/{team}/test-writer     # if present
 
-# 2. Fix P1 findings from reviewers
+# 2. If test-writer added a test runner (vitest/jest), install it at root:
+#    test-writer's worktree has node_modules; the integration branch
+#    only has the updated package.json + lockfile.
+if grep -q '"test":' package.json && ! [ -d node_modules/vitest ] && ! [ -d node_modules/jest ]; then
+  npm install   # or pnpm install / yarn
+fi
+
+# 3. Verify build + tests pass on integration branch
+npm run build
+npm test
+
+# 4. Fix P1 findings from reviewers
 # (apply fixes, commit)
 
-# 3. Push
+# 5. Push
 git push origin integration/{team}
 
 # 4. Merge back to base branch
