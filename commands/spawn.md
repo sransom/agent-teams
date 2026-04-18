@@ -293,7 +293,7 @@ ${LINT_CMD} && ${BUILD_CMD} && ${TEST_CMD}
 # 4. Fix P1 findings from reviewers
 # (apply fixes, commit)
 
-# 5. If the formula has a plan-update step OR this was mol-plan-first-team:
+# 5. If the formula has a plan-update step OR this was mol-plan-driven-team:
 #    update the plan file to reflect what shipped. See "Plan update" below.
 
 # 6. Push
@@ -314,7 +314,7 @@ bd list --status=open | grep {team}
 bd close {id1} {id2} ...
 ```
 
-#### Plan update (mol-plan-first-team and similar)
+#### Plan update (mol-plan-driven-team and similar)
 
 When the formula has a `plan-update` step — or when a `plan` var was passed and the plan file uses `- [ ]` checkbox milestones — tick off the checkboxes that got done before pushing integration.
 

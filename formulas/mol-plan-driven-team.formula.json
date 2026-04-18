@@ -1,5 +1,5 @@
 {
-  "formula": "mol-plan-first-team",
+  "formula": "mol-plan-driven-team",
   "description": "Same as mol-full-team with a plan-check step prepended and a plan-update step appended. Plan-checker verifies the plan is concrete enough to execute and writes a refined sidecar if needed. At integration, the orchestrator ticks checkboxes in the plan file for work that got done. Use when your plan is long, multi-milestone, or still rough.",
   "version": 1,
   "type": "convoy",

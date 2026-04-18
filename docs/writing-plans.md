@@ -1,12 +1,12 @@
 # Writing plans for agent teams
 
-An agent team (mol-full-team, mol-lite-team, mol-plan-first-team) decomposes a plan file into parallel arms. The quality of the plan directly determines the quality of the decomposition. This doc covers:
+An agent team (mol-full-team, mol-lite-team, mol-plan-driven-team) decomposes a plan file into parallel arms. The quality of the plan directly determines the quality of the decomposition. This doc covers:
 
 - Where plan files live
 - How to hand a plan to `/spawn`
 - What makes a plan decomposable
 - The checkbox + progress-log convention for multi-milestone work
-- When to use `mol-plan-first-team` (with plan-checker) vs `mol-full-team`
+- When to use `mol-plan-driven-team` (with plan-checker) vs `mol-full-team`
 
 ---
 
@@ -61,7 +61,7 @@ Run `/spawn` bare and when it asks for the `plan` var, paste the path. You can a
 3. **Per-arm notes** distilled by the explorer go into each implementer's spawn prompt. Arm implementers do NOT re-read the whole plan — they get only the slice relevant to them.
 4. **Judge** refers back to the plan to verify fidelity. It fails arms that drifted from what the plan asked for.
 5. **Code reviewer + codex reviewer** use the plan as a spec baseline for finding deviations.
-6. **Integrate** (in `mol-plan-first-team`) ticks checkboxes for what got done and appends a progress log.
+6. **Integrate** (in `mol-plan-driven-team`) ticks checkboxes for what got done and appends a progress log.
 
 ---
 
@@ -90,7 +90,7 @@ Run `/spawn` bare and when it asks for the `plan` var, paste the path. You can a
 - A stream-of-consciousness brainstorm with TODOs and questions still open.
 - Commands/idioms from the wrong stack (says "run `npm test`" in a Go repo).
 
-If your plan is closer to "bad" — use `mol-plan-first-team`. Its plan-checker agent will either refine it or tell you what's missing before you burn implementer tokens.
+If your plan is closer to "bad" — use `mol-plan-driven-team`. Its plan-checker agent will either refine it or tell you what's missing before you burn implementer tokens.
 
 ---
 
@@ -114,7 +114,7 @@ Multi-session or long-running work benefits from a visible checklist. Use GitHub
   - [ ] Dashboard panel
 ```
 
-Each `/spawn` run ticks the boxes it actually completes (the integrate step handles this when the formula supports it — currently `mol-plan-first-team`). After three weeks of runs, the plan file tells the story of what shipped.
+Each `/spawn` run ticks the boxes it actually completes (the integrate step handles this when the formula supports it — currently `mol-plan-driven-team`). After three weeks of runs, the plan file tells the story of what shipped.
 
 GitHub renders these as clickable checkboxes in PR descriptions and markdown previews — useful for status-at-a-glance.
 
@@ -143,7 +143,7 @@ This gives you a complete audit trail in the plan file itself — no external pr
 
 ---
 
-## When to use `mol-plan-first-team`
+## When to use `mol-plan-driven-team`
 
 Use it when:
 
@@ -161,7 +161,7 @@ Use regular `mol-full-team` or `mol-lite-team` when:
 ### Command
 
 ```bash
-/spawn --formula mol-plan-first-team --from-plan ~/plans/big-feature.md
+/spawn --formula mol-plan-driven-team --from-plan ~/plans/big-feature.md
 ```
 
 The plan-check step runs first (sonnet, ~$0.10) and returns one of:

@@ -107,14 +107,14 @@ Model names are family aliases (`haiku` / `sonnet` / `opus`) so they track Claud
 
 ### Formulas (`~/.beads/formulas/`)
 
-| Formula          | What it does                                                                                                  |
-|------------------|---------------------------------------------------------------------------------------------------------------|
-| full-team        | Ship end-to-end: explorer → implementer arms → judge → test + review → integrate                              |
-| lite-team        | Same as full-team, minus test-writer. For prototypes.                                                         |
-| plan-first-team  | full-team with a plan-checker prepended + checkbox/progress-log update at integrate. For multi-milestone plans. |
-| code-review      | Parallel specialist reviewers. Triage picks reviewers per file type; aggregate dedupes findings.              |
-| implement-arm    | Child formula bonded by the explorer. One implementer, one slice of a feature.                                |
-| review-arm       | Child formula bonded by triage. One specialist reviewer.                                                      |
+| Formula           | What it does                                                                                                    |
+|-------------------|-----------------------------------------------------------------------------------------------------------------|
+| full-team         | Ship end-to-end: explorer → implementer arms → judge → test + review → integrate                                |
+| lite-team         | Same as full-team, minus test-writer. For prototypes.                                                           |
+| plan-driven-team  | full-team with a plan-checker prepended + checkbox/progress-log update at integrate. For multi-milestone plans. |
+| code-review       | Parallel specialist reviewers. Triage picks reviewers per file type; aggregate dedupes findings.                |
+| implement-arm     | Child formula bonded by the explorer. One implementer, one slice of a feature.                                  |
+| review-arm        | Child formula bonded by triage. One specialist reviewer.                                                        |
 
 ---
 
