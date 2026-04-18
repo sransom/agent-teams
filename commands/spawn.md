@@ -116,11 +116,126 @@ Read the selected formula's `vars`. For each variable, resolve its value in this
 4. **Auto-detect**:
    - `repo` → `basename "$(pwd)"`
    - `base_branch` → `git branch --show-current`
-5. **Prompt** — only for required vars still unset after the above
+5. **For `plan` specifically** — run plan discovery (see "Plan discovery" below) instead of a bare prompt
+6. **Prompt** — only for remaining required vars still unset
 
 One question at a time. Skip optional vars unless the user asks to set them.
 
 Before the confirm step, show all resolved values and let the user override any one with a single prompt ("which var to change?"). This lets auto-detected values (especially `base_branch`) be corrected without restarting.
+
+#### Plan discovery
+
+When the selected formula has a `plan` var that's still unset after steps 1-4, don't just ask "enter a plan path" — **scan for existing plans and offer a picker.**
+
+**Scan roots (2 levels deep, ignore `*.refined.md` sidecars):**
+
+```bash
+find ./PLAN.md ./docs/plans ./plans ~/.claude/plans \
+     -maxdepth 3 -name "*.md" \
+     ! -name "*.refined.md" ! -name "TEMPLATE.md" ! -name "_template.md" ! -iname "*template*" \
+     2>/dev/null
+```
+
+For each file, read the first `# H1` heading as a one-line description hint.
+
+**Picker (when ≥1 plan file found):**
+
+```
+Found 3 plan files:
+
+  [1] docs/plans/todos-v2.md          — todos v2 — filtering, editing, persistence
+  [2] docs/plans/auth-refactor.md     — Rotate session tokens to argon2id
+  [3] ~/.claude/plans/big-rewrite.md  — Migrate payments flow to Stripe
+  [n] enter a path manually
+  [c] create a new plan
+
+>
+```
+
+- Numeric pick → set `plan` to that path, done.
+- `n` → free-text prompt for a path.
+- `c` → run **"Create a new plan"** flow (below).
+
+**When no plan files are found:** ask directly — "No plans discovered. Enter a path, or `c` to create one."
+
+**Formula-aware nudge** — if the user picked `mol-full-team` or `mol-lite-team` and a plan was discovered with ≥3 `- [ ]` checkboxes, offer to switch:
+
+```
+Heads up: docs/plans/todos-v2.md has 9 checkbox milestones.
+Switch to mol-plan-driven-team for plan verification + checkbox tracking? [y/N]
+```
+
+Trigger threshold: `grep -c '^- \[ \]' {plan}` ≥ 3. Silent otherwise.
+
+#### Create a new plan
+
+Triggered from the plan picker's `c` option, or when no plans exist and the user wants to start one.
+
+1. **Ask for a name** (kebab-case, validated):
+
+   ```
+   Plan name (kebab-case, e.g. auth-refactor): >
+   ```
+
+2. **Decide where to put it** — use the first of these that exists; if none, ask:
+   - `./docs/plans/` → `./docs/plans/{name}.md`
+   - `./plans/` → `./plans/{name}.md`
+   - `~/.claude/plans/` → `~/.claude/plans/{name}.md`
+   - fallback: ask "Where should this live? [1] docs/plans/ (create dir)  [2] plans/ (create dir)  [3] ~/.claude/plans/  [4] ./PLAN.md"
+
+3. **Look for a template** in the chosen directory first, then walk up to the repo root:
+
+   ```bash
+   # In the chosen plans dir, then each parent until repo root or home:
+   ls TEMPLATE.md _template.md .template.md *template*.md 2>/dev/null
+   ```
+
+   If multiple match, prefer this order: `TEMPLATE.md`, `_template.md`, `.template.md`, first `*template*.md` alphabetically.
+
+4. **If template found** — copy it to `{name}.md` and substitute placeholders:
+   - `{{name}}` → the kebab-case name
+   - `{{feature}}` → the `feature` var (or name, if feature isn't set yet)
+   - `{{date}}` → today's date (`YYYY-MM-DD`)
+
+   Report: `Copied template from {template-path} → {new-plan-path}`.
+
+5. **If no template found** — scaffold with this skeleton:
+
+   ```markdown
+   # {name}
+
+   ## Problem statement
+
+   <!-- One or two sentences: what you're building and why. -->
+
+   ## Out of scope
+
+   - …
+
+   ## Milestones
+
+   - [ ] …
+   - [ ] …
+
+   ## Testing
+
+   <!-- What needs tests, where they live. -->
+
+   ## Progress log
+
+   <!-- integrate step appends here -->
+   ```
+
+6. **Stop the wizard** — the plan is empty. Don't continue with a placeholder plan. Output:
+
+   ```
+   Created {path}.
+
+   Fill it in, then re-run:
+     /spawn --formula {formula} --from-plan {path}
+   ```
+
+   Exit cleanly — do NOT pour the molecule.
 
 ### Step 3 — Confirm + pour
 

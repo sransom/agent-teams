@@ -21,6 +21,34 @@ A plan is a plain markdown file. Conventions (pick what fits):
 
 agent-teams doesn't care where the file lives — you just pass the path.
 
+### Templates
+
+`/spawn` discovers plan files automatically (scans `./PLAN.md`, `./docs/plans/`, `./plans/`, `~/.claude/plans/`, two levels deep). If none exist, it offers to scaffold a new one. You can drop a template in any plans directory and `/spawn` will use it instead of the built-in skeleton:
+
+- `TEMPLATE.md`, `_template.md`, `.template.md`, or any `*template*.md` (case-insensitive)
+- Placeholders substituted on copy: `{{name}}`, `{{feature}}`, `{{date}}`
+
+Example `docs/plans/TEMPLATE.md`:
+
+```markdown
+# {{name}}
+
+**Created:** {{date}}
+
+## Problem statement
+
+## Out of scope
+
+## Milestones
+- [ ] …
+
+## Testing
+
+## Progress log
+```
+
+Templates are searched in the chosen plans directory first, then parent dirs up to the repo root — so a repo-wide template at `./TEMPLATE.md` applies to any subfolder. If no template is found, the built-in skeleton is used.
+
 ---
 
 ## How to hand a plan to `/spawn`
