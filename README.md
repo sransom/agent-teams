@@ -16,6 +16,7 @@ agent-teams gives you:
 - **Dynamic decomposition** — the explorer decides how to split work at runtime based on what the codebase actually looks like
 - **Dependency tracking in beads** — `bd ready` drives sequencing; resumable across sessions
 - **Model routing** — cheap models for mechanical work (haiku), smart models for judgment (sonnet), optional Codex delegation for ~3x savings on implementation
+- **Stack profiles** — `/spawn` auto-detects your repo's stack (Next.js, Deno, Go, Rust, Python, Swift, or generic) and injects the right lint/test/build commands into agent prompts. No hardcoded `npm run lint`.
 - **Two commands** — `/build-team` to design a workflow, `/spawn` to run one
 
 ---
@@ -32,8 +33,9 @@ The installer will:
 1. Check for `claude` (required), `bd` (required for orchestration), `codex` (optional)
 2. Copy **agents** (5) and **commands** (2) into `~/.claude/` — where Claude Code reads them
 3. Copy **formulas** (5) into `~/.beads/formulas/` — where beads reads them
-4. Back up anything it would overwrite (`.bak.{timestamp}` suffix)
-5. Optionally append a model-routing block to `~/.claude/CLAUDE.md`
+4. Copy **profiles** (8 stack conventions) into `~/.claude/agent-teams-profiles/`
+5. Back up anything it would overwrite (`.bak.{timestamp}` suffix)
+6. Optionally append a model-routing block to `~/.claude/CLAUDE.md`
 
 The split reflects where each tool looks for its files. Both paths can be overridden with `CLAUDE_DIR=...` or `BEADS_DIR=...` env vars if your setup differs.
 
@@ -160,12 +162,21 @@ This requires the [Codex CLI](https://github.com/openai/codex) installed. The im
 
 ---
 
+## Stack profiles
+
+agent-teams stays stack-agnostic via a `profiles/` directory. Each profile is a short markdown file that tells the agents how to lint, test, build, and commit for a given stack. `/spawn` detects your stack (by scanning for marker files like `package.json`, `Cargo.toml`, `go.mod`) and injects the right profile into agent prompts automatically.
+
+Shipped profiles: `nextjs-ts`, `node-ts`, `deno`, `go`, `rust`, `python`, `swift-ios`, `generic` (fallback).
+
+Override with `--profile <name>` if detection is wrong, or drop your own `.md` file into `~/.claude/agent-teams-profiles/` for a custom stack. See [`profiles/README.md`](profiles/README.md).
+
 ## Docs
 
 - [`docs/architecture.md`](docs/architecture.md) — how the DAG, beads tracking, and worktree isolation fit together
 - [`docs/model-routing.md`](docs/model-routing.md) — which models for which roles and why
 - [`docs/writing-formulas.md`](docs/writing-formulas.md) — create custom formulas by hand or with `/build-team`
 - [`docs/writing-agents.md`](docs/writing-agents.md) — define custom agents that plug into formulas
+- [`profiles/README.md`](profiles/README.md) — stack profiles explained
 
 ---
 

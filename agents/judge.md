@@ -43,24 +43,28 @@ Check all four. Every criterion must pass for an overall PASS.
 - No console.logs, debug code, or TODO stubs left in production paths
 
 ### 3. Lint
-Detect the lint command from the repo (check package.json scripts, deno.json, Cargo.toml, etc.) and run it in the worktree:
+Run the lint command in the worktree. When the orchestrator injects a `## Stack profile` section into your spawn prompt, use the `LINT` command from it. Otherwise detect from the repo (check `package.json`, `deno.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, `Makefile`, etc.):
+
 ```bash
-cd {worktree-path} && npm run lint   # or pnpm check, deno lint, cargo clippy, etc.
+cd {worktree-path} && ${LINT_CMD}   # from profile or detected
 ```
-Must pass clean. Any lint errors = FAIL.
+
+Must pass clean. Any lint errors = FAIL. Warnings do NOT fail on their own unless the lint command is configured to treat them as errors.
 
 ### 4. Tests exist
 - Are there test files for the code that was written?
 - Do the tests for the **changed files** run without errors?
 
-Run only the tests colocated with or directly covering the changed files — do NOT run the full suite (CI handles that):
-```bash
-# Vitest/Jest — pass only the changed test files
-npx vitest run path/to/changed.test.ts --reporter=verbose
+Run only the tests directly covering the changed files — do NOT run the full suite (CI handles that). Use the `TEST` command from the stack profile, narrowed to changed files:
 
-# Deno — pass only the changed test files
-deno test --no-lock path/to/changed.test.ts
-```
+- **JS/TS (vitest):** `npx vitest run path/to/changed.test.ts --reporter=verbose`
+- **JS/TS (jest):** `npx jest path/to/changed.test.ts`
+- **Deno:** `deno test --no-lock path/to/changed_test.ts`
+- **Go:** `go test ./path/to/package`
+- **Rust:** `cargo test -p {crate} {test_name_substring}`
+- **Python (pytest):** `pytest path/to/test_thing.py`
+- **Swift (XCTest):** `xcodebuild test -scheme {scheme} -only-testing:{module}/{TestClass}`
+
 Tests failing = FAIL. No tests where tests were expected = FAIL.
 Do not fail because unrelated tests in the repo are broken — only the tests for the arm's changed files matter here.
 
@@ -91,16 +95,15 @@ Summary: Implementation is complete and correct. Ready to merge.
 VERDICT: FAIL
 
 Plan fidelity: ✓ All items implemented.
-Correctness:   ✗ FAIL — src/api/auth.ts line 42: null check missing on user object.
-                        src/hooks/useAuth.ts line 18: wrong return type, returns void not boolean.
+Correctness:   ✗ FAIL — {path/to/file}:{line}: {what's wrong and why}
+                        {another issue with location}
 Lint:          ✓ Clean.
-Tests:         ✗ FAIL — no tests for useAuth hook. Auth API tests present but 2 failing.
+Tests:         ✗ FAIL — {what's missing or failing}
 
 Specific fixes required:
-1. Add null guard on user object in src/api/auth.ts:42
-2. Fix return type on useAuth hook — should return boolean
-3. Write tests for useAuth hook
-4. Fix the 2 failing auth API tests
+1. {concrete action, naming the file and line}
+2. {another concrete action}
+...
 
 Do not proceed until all four criteria pass.
 ```

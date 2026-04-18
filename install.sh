@@ -136,6 +136,12 @@ else
   warn "Skipped commands"
 fi
 
+if ask_yn "Install stack profiles into $CLAUDE_DIR/agent-teams-profiles/?" y; then
+  copy_dir profiles "Profiles" "$CLAUDE_DIR/agent-teams-profiles"
+else
+  warn "Skipped profiles"
+fi
+
 # ---------- CLAUDE.md routing block ----------
 
 head "CLAUDE.md model routing guidance"

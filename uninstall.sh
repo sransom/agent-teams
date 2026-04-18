@@ -72,6 +72,7 @@ head "Removing shipped files"
 remove_if_shipped agents "Agents"
 remove_if_shipped formulas "Formulas" "$BEADS_DIR/formulas"
 remove_if_shipped commands "Commands"
+remove_if_shipped profiles "Profiles" "$CLAUDE_DIR/agent-teams-profiles"
 
 head "CLAUDE.md cleanup"
 

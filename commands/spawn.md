@@ -19,6 +19,8 @@ Explorer maps the codebase, decomposes work into implementer arms with non-overl
 /spawn --resume {team-name}                                 # resume specific team
 /spawn --list                                               # show available formulas, exit
 /spawn --dry-run ...                                        # pour + show DAG, don't dispatch
+/spawn --profile go                                         # override stack detection
+/spawn --profile none                                       # skip profile injection entirely
 ```
 
 **Var passthrough.** Any `--var key=value` flag pre-fills that variable and skips the prompt for it. The wizard only asks for vars that weren't provided.
@@ -48,6 +50,40 @@ Set beads context to the current repo if not already set:
 ```bash
 bd set_context "$(pwd)"
 ```
+
+### Step 0.5 — Detect the repo's stack profile
+
+Before dispatching agents, figure out which stack profile to inject into their spawn prompts. This is what makes the orchestration stack-agnostic.
+
+**Detection order — first match wins:**
+
+| Marker file                             | Profile       |
+|-----------------------------------------|---------------|
+| `package.json` contains `"next"` dep    | `nextjs-ts`   |
+| `package.json` (no `next`)              | `node-ts`     |
+| `deno.json` / `deno.jsonc`              | `deno`        |
+| `go.mod`                                | `go`          |
+| `Cargo.toml`                            | `rust`        |
+| `pyproject.toml` / `setup.py`           | `python`      |
+| `Package.swift` / `*.xcodeproj`         | `swift-ios`   |
+| (none match)                            | `generic`     |
+
+Read the matched profile from `~/.claude/agent-teams-profiles/{name}.md`. If the profile file is missing, fall back to `generic.md`. If `generic.md` is also missing, proceed with no injected profile — the explorer will set lint/test defaults per arm.
+
+**Override:** `--profile <name>` skips detection. `--profile none` injects nothing.
+
+Report the decision to the user:
+
+```
+Stack profile: nextjs-ts (detected via package.json → next dep)
+   Lint:   npm run lint
+   Test:   npx vitest run <files>
+   Build:  npm run build
+```
+
+**How the profile is used:** when spawning the explorer, implementer, judge, and test-writer, append the profile's full contents to the spawn prompt under a section header `## Stack profile` — so the agent sees both its normal instructions AND the stack-specific commands/conventions. The profile is a prompt fragment, not a script.
+
+The `{{lint_cmd_default}}` variable in `mol-full-team` and `mol-lite-team` formulas should be set from the profile's LINT command at pour time (via `--var lint_cmd_default=...`). If you're pouring manually, copy the value from the profile.
 
 ### Step 1 — Pick a formula
 
@@ -223,7 +259,7 @@ beads blocks `mol-*` prefixed formula names for bond resolution. If you renamed 
 
 #### Seed dependent arms from their upstream
 
-When arm B has a beads dep on arm A (`bd dep add B A`) because B consumes files A creates, **merge A's branch into B's worktree before dispatching B**. Otherwise B's `npm run lint` / build fails on missing imports (the types file A creates doesn't exist in B's worktree until merge time).
+When arm B has a beads dep on arm A (`bd dep add B A`) because B consumes files A creates, **merge A's branch into B's worktree before dispatching B**. Otherwise B's lint or typecheck fails on missing imports (the file A creates doesn't exist in B's worktree until merge time) — regardless of stack (TS, Go, Rust, Python all hit this differently but for the same reason).
 
 ```bash
 # After A closes, before claiming B:
@@ -243,16 +279,16 @@ git checkout -b integration/{team}
 git merge agent/{team}/impl-{arm}      # repeat per arm
 git merge agent/{team}/test-writer     # if present
 
-# 2. If test-writer added a test runner (vitest/jest), install it at root:
-#    test-writer's worktree has node_modules; the integration branch
-#    only has the updated package.json + lockfile.
-if grep -q '"test":' package.json && ! [ -d node_modules/vitest ] && ! [ -d node_modules/jest ]; then
-  npm install   # or pnpm install / yarn
-fi
+# 2. If test-writer added a test runner, the integration branch now has the
+#    updated dep manifest but not the installed deps. Install once per stack:
+#    - JS/TS: npm install / pnpm install / yarn
+#    - Python: pip install -e . / poetry install / uv sync
+#    - Rust: cargo fetch (or just let cargo build pull them)
+#    - Go: go mod download
+#    Use the stack profile's convention; skip for stacks with no separate install step.
 
-# 3. Verify build + tests pass on integration branch
-npm run build
-npm test
+# 3. Verify build + tests pass on integration branch using the profile's commands
+${LINT_CMD} && ${BUILD_CMD} && ${TEST_CMD}
 
 # 4. Fix P1 findings from reviewers
 # (apply fixes, commit)

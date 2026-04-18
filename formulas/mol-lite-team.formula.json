@@ -21,8 +21,8 @@
       "default": ""
     },
     "lint_cmd_default": {
-      "description": "Default lint command if explorer cannot determine a better one per arm",
-      "default": "npm run lint"
+      "description": "Default lint command. /spawn sets this from the detected stack profile. Leave empty and the explorer will pick one per arm.",
+      "default": ""
     },
     "base_branch": {
       "description": "The branch to merge integration/{team} back into after all work is done",

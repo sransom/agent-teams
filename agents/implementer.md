@@ -22,15 +22,21 @@ Read your assigned model from the spawn prompt (`model:` label on the beads issu
 
 If Codex mode is requested but `codex --version` fails, fall back to Claude mode and flag it in your report.
 
+## Stack profile
+
+When the orchestrator injects a `## Stack profile` section into your spawn prompt, read it first. It tells you the lint command, commit-hook-skip convention, and file layout for this repo's stack. Use it instead of guessing.
+
+If no profile was injected, use the `lint_cmd` field from your arm spec. If that's also empty, detect the stack from `package.json` / `Cargo.toml` / `go.mod` / etc. and pick a sensible default.
+
 ## Claude mode workflow
 
 1. Read the plan and the target files listed in `files` / `patterns`.
 2. Implement the plan using Read/Edit/Write, one file at a time.
-3. Run the lint command from the plan (`npm run lint`, `pnpm check`, `deno lint`, `cargo clippy`, etc.).
+3. Run the lint command from the stack profile or arm spec.
 4. Fix any lint errors yourself. Small issues are expected.
-5. Commit:
+5. Commit using the profile's skip-hooks flag (e.g. `HUSKY=0` for JS/TS repos, `SKIP=all` for pre-commit framework, nothing if no hooks):
    ```bash
-   HUSKY=0 git add -A && HUSKY=0 git commit -m "feat: <description>"
+   git add -A && git commit -m "feat: <description>"
    ```
 6. Report: `Done: implementer (Claude) — N files changed. <flags>`
 
@@ -61,9 +67,9 @@ If Codex mode is requested but `codex --version` fails, fall back to Claude mode
 
 4. Run lint. Fix failures yourself with Edit/Write — do not re-run codex for small lint issues.
 
-5. Commit remaining changes if codex didn't:
+5. Commit remaining changes if codex didn't — use the profile's skip-hooks flag:
    ```bash
-   HUSKY=0 git add -A && HUSKY=0 git commit -m "feat: <description>"
+   git add -A && git commit -m "feat: <description>"
    ```
 
 6. Report: `Done: implementer (Codex <model>) — N files changed. <flags>`
