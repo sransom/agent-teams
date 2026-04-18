@@ -186,6 +186,33 @@ No re-pouring, no lost work. beads is the source of truth for what's done and wh
 
 ---
 
+## Troubleshooting
+
+### "Agent type 'X' not found" after installing
+
+Claude Code snapshots the registered agent list at session start. Newly installed agents (including the five shipped here) won't appear until you **restart Claude Code**. Close the current session and start a new one.
+
+### "formula 'X' not found" when running `bd mol bond`
+
+beads' `bd mol bond` command only resolves formula names that start with `mol-`. All shipped formulas use this convention (`mol-full-team`, `mol-implement-arm`, etc.). If you're writing custom formulas and want them usable with `bd mol bond`, prefix the filename with `mol-`. See `docs/writing-formulas.md`.
+
+### Arm B's lint fails with "cannot find module '@/lib/foo'"
+
+Arm B depends on a file that arm A creates, but B's worktree was branched off `main` before A landed. Merge A's branch into B's worktree before dispatching B:
+
+```bash
+cd /path/to/{team}-impl-{arm-b}
+git merge agent/{team}/impl-{arm-a} --no-edit
+```
+
+If the merge conflicts, that's a real decomposition problem — re-think the arm boundaries.
+
+### Judge returns ready immediately (before arms close)
+
+beads doesn't enforce `waits_for: all-children` automatically — it's a declaration the orchestrator reads and acts on. The orchestrator should dispatch the explorer first, execute its bond commands, dispatch the arms by ID, wait for them to close, then claim the judge. See `commands/spawn.md` Step 5.
+
+---
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

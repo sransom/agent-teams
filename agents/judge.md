@@ -66,9 +66,13 @@ Do not fail because unrelated tests in the repo are broken — only the tests fo
 
 ## Output format
 
-Always start your response with exactly one of:
+**Always start your response with a verdict line, EVEN on PASS.** The orchestrator reads the first line to decide the next step — if the verdict is missing it cannot distinguish "judge PASS and closed" from "judge crashed mid-run".
+
+Start your response with exactly one of:
 - `VERDICT: PASS`
 - `VERDICT: FAIL`
+
+After running the closing commands (e.g. `bd close` on PASS), still include the verdict line and the structured reasoning below in your reported output. Don't just close silently.
 
 Then provide structured reasoning:
 

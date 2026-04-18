@@ -196,17 +196,22 @@ fi
 head "Quick start"
 cat <<EOF
 
+  ${YELLOW}!${RESET} ${YELLOW}Restart Claude Code before running /spawn or /build-team.${RESET}
+    Claude Code snapshots agents and commands at session start — newly
+    installed ones aren't visible until the next session. Close your
+    current session and start a new one.
+
   /build-team          — interactive wizard to create a new formula
   /spawn               — pick an existing formula and run it
   /spawn --list        — see available formulas
   /spawn --dry-run     — pour + show DAG without dispatching agents
 
 Formulas shipped:
-  full-team      Ship a feature with explorer → implementer arms → judge → test + review → integrate
-  lite-team      Same as full-team, minus test-writer
-  code-review    Parallel specialist review of a PR
-  implement-arm  (child, used by full-team/lite-team)
-  review-arm     (child, used by code-review)
+  mol-full-team      Ship a feature with explorer → implementer arms → judge → test + review → integrate
+  mol-lite-team      Same as mol-full-team, minus test-writer
+  mol-code-review    Parallel specialist review of a PR
+  mol-implement-arm  (child, used by mol-full-team/mol-lite-team)
+  mol-review-arm     (child, used by mol-code-review)
 
 Docs: $REPO_DIR/docs/
 

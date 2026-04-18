@@ -221,6 +221,18 @@ bd mol bond mol-implement-arm {ROOT_EPIC_ID} \
 
 beads blocks `mol-*` prefixed formula names for bond resolution. If you renamed a formula without the prefix, `bd mol bond` will fail with "not found (not an issue ID or formula name)". Our shipped formulas all use the `mol-` prefix in their filenames for this reason.
 
+#### Seed dependent arms from their upstream
+
+When arm B has a beads dep on arm A (`bd dep add B A`) because B consumes files A creates, **merge A's branch into B's worktree before dispatching B**. Otherwise B's `npm run lint` / build fails on missing imports (the types file A creates doesn't exist in B's worktree until merge time).
+
+```bash
+# After A closes, before claiming B:
+cd /path/to/{team}-impl-{arm-b}
+git merge agent/{team}/impl-{arm-a} --no-edit
+```
+
+If the merge produces conflicts, that's a real dependency conflict between the arms — stop and re-plan the decomposition. Don't dispatch B on a dirty merge state.
+
 ### Step 6 — Integration
 
 When the `integrate` task (or the last orchestrator-labeled step) becomes ready:
