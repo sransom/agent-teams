@@ -1,6 +1,6 @@
 # /build-team
 
-Interactive wizard to create a new agent team formula from scratch. Produces a `.formula.json` file in `~/.claude/formulas/` that `/spawn` can run.
+Interactive wizard to create a new agent team formula from scratch. Produces a `.formula.json` file in `~/.beads/formulas/` that `/spawn` can run.
 
 ---
 
@@ -17,7 +17,7 @@ Formula name? (kebab-case, e.g. docs-refresh, security-audit)
 >
 ```
 
-Validate: lowercase, hyphens only, not already in `~/.claude/formulas/`. If it exists, ask whether to overwrite or pick a different name.
+Validate: lowercase, hyphens only, not already in `~/.beads/formulas/`. If it exists, ask whether to overwrite or pick a different name.
 
 ### Step 1 — Describe
 
@@ -239,7 +239,7 @@ Raw JSON:
 
 What would you like to do?
 
-  [s] save to ~/.claude/formulas/auth-refactor.formula.json
+  [s] save to ~/.beads/formulas/auth-refactor.formula.json
   [n] edit name or description
   [r] edit roles (add, remove, or swap a step's agent)
   [d] edit DAG (change what a step waits for)
@@ -252,7 +252,7 @@ What would you like to do?
 On `s`, write the file and print:
 
 ```
-✓ Saved: ~/.claude/formulas/auth-refactor.formula.json
+✓ Saved: ~/.beads/formulas/auth-refactor.formula.json
 Run it with: /spawn auth-refactor
 ```
 

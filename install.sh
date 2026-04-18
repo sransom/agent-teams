@@ -9,6 +9,9 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
+# beads reads formulas from ~/.beads/formulas/ (user-level, checked after
+# project-level .beads/formulas/). Agents + commands go under ~/.claude/.
+BEADS_DIR="${BEADS_DIR:-$HOME/.beads}"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 
 RED=$'\033[31m'
@@ -84,9 +87,9 @@ fi
 # ---------- copy files ----------
 
 copy_dir() {
-  local src_name="$1" kind="$2"
+  local src_name="$1" kind="$2" dst_override="${3:-}"
   local src="$REPO_DIR/$src_name"
-  local dst="$CLAUDE_DIR/$src_name"
+  local dst="${dst_override:-$CLAUDE_DIR/$src_name}"
 
   mkdir -p "$dst"
 
@@ -121,8 +124,8 @@ else
   warn "Skipped agents"
 fi
 
-if ask_yn "Install 5 formulas into $CLAUDE_DIR/formulas/?" y; then
-  copy_dir formulas "Formulas"
+if ask_yn "Install 5 formulas into $BEADS_DIR/formulas/?" y; then
+  copy_dir formulas "Formulas" "$BEADS_DIR/formulas"
 else
   warn "Skipped formulas"
 fi

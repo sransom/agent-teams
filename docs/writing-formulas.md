@@ -16,9 +16,21 @@ If you don't want to hand-edit JSON, skip this doc and run `/build-team`. It wal
 4. Declare variables
 5. Review + save
 
-The output is a formula in `~/.claude/formulas/` that `/spawn` can run.
+The output is a formula in `~/.beads/formulas/` that `/spawn` can run.
 
 Keep reading if you want to understand or hand-edit the JSON.
+
+---
+
+## Where formulas live
+
+beads searches three locations, in order:
+
+1. `.beads/formulas/` — project-level, checked first. Commit these to a repo when a formula is specific to that codebase.
+2. `~/.beads/formulas/` — user-level, where agent-teams installs its 5 formulas. Your personal formulas go here too.
+3. `$GT_ROOT/.beads/formulas/` — orchestrator-level, only if `GT_ROOT` is set.
+
+`bd formula list` (from inside a repo with `bd init` run) shows what's visible from your current location.
 
 ---
 
@@ -189,7 +201,7 @@ Minimal 2-step example:
 }
 ```
 
-Save as `~/.claude/formulas/plan-and-ship.formula.json` and `/spawn --formula plan-and-ship`.
+Save as `~/.beads/formulas/plan-and-ship.formula.json` and `/spawn --formula plan-and-ship`.
 
 ---
 

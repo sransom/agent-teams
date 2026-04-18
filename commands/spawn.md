@@ -1,6 +1,6 @@
 # /spawn
 
-Pick an existing formula from `~/.claude/formulas/` and run it — worktree-isolated, beads-tracked.
+Pick an existing formula from `~/.beads/formulas/` and run it — worktree-isolated, beads-tracked.
 
 Explorer maps the codebase, decomposes work into implementer arms with non-overlapping file boundaries, bonds them in beads. `bd ready` drives all sequencing. Judge gates merges. Code-reviewer reports findings. Orchestrator integrates.
 
@@ -25,7 +25,7 @@ Explorer maps the codebase, decomposes work into implementer arms with non-overl
 
 **`--from-plan <file>`.** Reads the plan file. Auto-sets `plan` to the file's path and (optionally) `feature` to the first H1 heading in the file. The user still confirms and can override.
 
-**`--list`.** Shows all available formulas (from `~/.claude/formulas/*.formula.json`) with name + description, then exits. Does not pour or dispatch. Combine with no other flags.
+**`--list`.** Shows all available formulas (from `~/.beads/formulas/*.formula.json`) with name + description, then exits. Does not pour or dispatch. Combine with no other flags.
 
 **`--dry-run`.** Runs Steps 1–3 (pick formula, collect vars, pour, `bd graph`, `bd ready`) but stops before dispatching any agents. Useful for validating a new custom formula without burning tokens. Leaves the beads issues in place — the user can continue by running `/spawn --resume {team}`, or tear down with `bd list --status=open | grep {team} | bd close ...`. Print the teardown command at the end of the dry run.
 
@@ -38,7 +38,7 @@ Explorer maps the codebase, decomposes work into implementer arms with non-overl
 Check:
 ```bash
 bd --version                      # beads must be available
-ls ~/.claude/formulas/*.json      # at least one formula must exist
+ls ~/.beads/formulas/*.json      # at least one formula must exist
 ```
 
 If `bd` is missing: tell the user to install the beads plugin and stop.
@@ -54,7 +54,7 @@ bd set_context "$(pwd)"
 If `--formula <name>` was passed, jump straight to that formula. Otherwise:
 
 ```bash
-ls ~/.claude/formulas/*.formula.json
+ls ~/.beads/formulas/*.formula.json
 ```
 
 For each file, read the `formula` and `description` fields and show:

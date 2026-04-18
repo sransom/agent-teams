@@ -30,9 +30,12 @@ cd agent-teams
 
 The installer will:
 1. Check for `claude` (required), `bd` (required for orchestration), `codex` (optional)
-2. Ask before copying each of: 5 agents, 5 formulas, 2 commands into `~/.claude/`
-3. Back up anything it would overwrite (`.bak.{timestamp}` suffix)
-4. Optionally append a model-routing block to `~/.claude/CLAUDE.md`
+2. Copy **agents** (5) and **commands** (2) into `~/.claude/` — where Claude Code reads them
+3. Copy **formulas** (5) into `~/.beads/formulas/` — where beads reads them
+4. Back up anything it would overwrite (`.bak.{timestamp}` suffix)
+5. Optionally append a model-routing block to `~/.claude/CLAUDE.md`
+
+The split reflects where each tool looks for its files. Both paths can be overridden with `CLAUDE_DIR=...` or `BEADS_DIR=...` env vars if your setup differs.
 
 To remove: `./uninstall.sh`. It asks before deleting modified files and cleans its CLAUDE.md block.
 
@@ -81,7 +84,7 @@ Wizard walks you through:
 4. **Variables** — pre-seeded with `team`, `feature`, `repo`; add your own.
 5. **Review + save** — plain-English summary, then raw JSON. Edit any part without restarting.
 
-Output: a `.formula.json` in `~/.claude/formulas/` that `/spawn` can run.
+Output: a `.formula.json` in `~/.beads/formulas/` that `/spawn` can run.
 
 ---
 
@@ -99,7 +102,7 @@ Output: a `.formula.json` in `~/.claude/formulas/` that `/spawn` can run.
 
 Model names are family aliases (`haiku` / `sonnet` / `opus`) so they track Claude Code's latest defaults. Pin to a snapshot (e.g. `claude-sonnet-4-6`) if you want reproducibility.
 
-### Formulas (`~/.claude/formulas/`)
+### Formulas (`~/.beads/formulas/`)
 
 | Formula       | What it does                                                                                                  |
 |---------------|---------------------------------------------------------------------------------------------------------------|

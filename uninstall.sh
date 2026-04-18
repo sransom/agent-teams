@@ -7,6 +7,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
+BEADS_DIR="${BEADS_DIR:-$HOME/.beads}"
 
 RED=$'\033[31m'
 GREEN=$'\033[32m'
@@ -34,9 +35,9 @@ ask_yn() {
 }
 
 remove_if_shipped() {
-  local src_name="$1" kind="$2"
+  local src_name="$1" kind="$2" dst_override="${3:-}"
   local src="$REPO_DIR/$src_name"
-  local dst="$CLAUDE_DIR/$src_name"
+  local dst="${dst_override:-$CLAUDE_DIR/$src_name}"
 
   [ -d "$dst" ] || return 0
 
@@ -69,7 +70,7 @@ remove_if_shipped() {
 head "Removing shipped files"
 
 remove_if_shipped agents "Agents"
-remove_if_shipped formulas "Formulas"
+remove_if_shipped formulas "Formulas" "$BEADS_DIR/formulas"
 remove_if_shipped commands "Commands"
 
 head "CLAUDE.md cleanup"
