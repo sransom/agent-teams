@@ -177,6 +177,26 @@ Walk the formula's step DAG. For each ready task:
 
 4. **Parallel dispatch**: if multiple tasks in `bd ready` share the same `needs` set, spawn them in a **single message** so they run in parallel.
 
+#### Read-only agents cannot close their own beads issues or bond children
+
+Some agents (explorer, code-reviewer) ship without the `Bash` tool — they're read-only by design. They cannot run `bd close`, `bd mol bond`, or any shell commands. When the orchestrator dispatches a read-only agent:
+
+1. **Expect a report, not side effects.** The agent returns structured output describing what should happen next (e.g. the explorer returns a `DECOMPOSITION:` block with one `bond_command` per arm).
+2. **Execute the commands yourself.** Parse the agent's output for `bd mol bond ...` commands (explorer) or bond/dep/close commands (reviewer with follow-ups) and run them from the project root.
+3. **Close the agent's beads issue yourself** after executing its recommended actions: `bd close {agent-issue-id}`.
+
+Agents with `Bash` in their tools (implementer, judge, test-writer) can handle their own beads operations and should close their own issues.
+
+#### CRITICAL: `bd ready` does not surface bonded arms
+
+Once the explorer bonds implementer arms under the root epic, those arms do **not** appear in `bd ready` until the root epic closes (which happens last). `bd ready` will only show the root epic itself and any non-bonded steps.
+
+This means the orchestrator must:
+
+1. **Track arm IDs from the bond output.** Each `bd mol bond mol-implement-arm ...` prints "Spawned: N issues". Capture the resulting arm task IDs — either from the output or by running `bd list --parent {root-epic-id}` after bonding.
+2. **Dispatch arms by ID directly**, not by polling `bd ready`. Use `bd show {arm-id}` to confirm status before dispatch.
+3. **Poll arm closure**: after dispatching, check each arm's status with `bd show {arm-id}` until all are `closed`. Do not rely on `bd ready` to signal completion.
+
 #### CRITICAL: enforce `waits_for: all-children` yourself
 
 `bd ready` returns the judge (or any step with `waits_for: all-children`) as ready **immediately** — beads does NOT block it until bonded children exist and close. That's an orchestrator responsibility.
@@ -184,12 +204,8 @@ Walk the formula's step DAG. For each ready task:
 When the formula declares `waits_for: all-children` on a step, you must:
 
 1. **Do not claim that step from `bd ready` directly.** Skip it and pick another ready task.
-2. Dispatch the upstream decomposing step (explorer / triage). That step bonds child molecules via `bd mol bond mol-child-formula {root-epic-id}`.
-3. After the decomposing step closes, verify **all bonded children are closed** before claiming the gated step:
-   ```bash
-   bd list --status=open --parent {root-epic-id} --json | jq length
-   # When this returns 1 (just the gated step itself), you can proceed.
-   ```
+2. Dispatch the upstream decomposing step (explorer / triage). Parse its report for `bd mol bond` commands and run them yourself (explorer is read-only, cannot bond).
+3. After bonding, dispatch each arm by ID. Poll `bd show {arm-id}` until all arms are closed.
 4. Only then claim and dispatch the gated step.
 
 Getting this wrong means dispatching the judge before any arms have been built — the judge will have nothing to judge and will either PASS vacuously or FAIL on missing work. Both are wrong outcomes.
