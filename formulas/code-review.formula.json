@@ -1,0 +1,55 @@
+{
+  "formula": "code-review",
+  "description": "Review a PR or branch in parallel with specialist reviewers. A triage step reads the diff, picks the right reviewers for each file type, runs them in parallel, and aggregates findings into a single P1/P2/P3 report (optionally posted as a PR comment).",
+  "version": 1,
+  "type": "convoy",
+  "vars": {
+    "pr": {
+      "description": "PR number or branch name to review",
+      "required": true
+    },
+    "repo": {
+      "description": "GitHub repo in org/name format (e.g. myorg/my-app)",
+      "required": true
+    },
+    "base_branch": {
+      "description": "Base branch to diff against",
+      "default": "main"
+    },
+    "post_comment": {
+      "description": "Whether to post findings as a GitHub PR comment",
+      "type": "bool",
+      "default": "false"
+    },
+    "reviewer_registry": {
+      "description": "Path to a reviewer registry JSON file (see examples/reviewer-registry.example.json). Triage matches changed files against the registry's conditional patterns.",
+      "default": "~/.claude/reviewer-registry.json"
+    }
+  },
+  "steps": [
+    {
+      "id": "triage",
+      "title": "[review-{{pr}}] triage: detect file types and bond reviewer arms",
+      "type": "task",
+      "description": "Fetch diff for PR {{pr}} in {{repo}}. Read the reviewer registry at {{reviewer_registry}}. Match changed files against conditional patterns. Bond one review-arm per matched specialist plus all 'always' reviewers. If no registry is present, bond a single generic code-reviewer arm. Close when all arms are bonded.",
+      "labels": [
+        "agent:triage",
+        "model:haiku"
+      ]
+    },
+    {
+      "id": "aggregate",
+      "title": "[review-{{pr}}] aggregate: synthesize findings",
+      "type": "task",
+      "description": "Collect reports from all reviewer arms. Deduplicate overlapping findings. Produce final P1/P2/P3 summary. If post_comment=true, post to PR {{pr}} via gh pr comment.",
+      "labels": [
+        "agent:aggregate",
+        "model:sonnet"
+      ],
+      "waits_for": "all-children",
+      "needs": [
+        "triage"
+      ]
+    }
+  ]
+}

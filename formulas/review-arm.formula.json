@@ -1,0 +1,45 @@
+{
+  "formula": "review-arm",
+  "description": "Child formula: one specialist reviewer (e.g. security, TypeScript, SQL) focused on a subset of changed files. The triage step of code-review bonds one of these per matched specialist. Not meant to be invoked directly — use code-review.",
+  "version": 1,
+  "type": "convoy",
+  "vars": {
+    "agent": {
+      "description": "Specialist agent name (e.g. typescript-reviewer, security-sentinel, code-reviewer)",
+      "required": true
+    },
+    "focus": {
+      "description": "What this reviewer focuses on",
+      "required": true
+    },
+    "pr": {
+      "description": "PR number being reviewed",
+      "required": true
+    },
+    "repo": {
+      "description": "GitHub repo in org/name format",
+      "required": true
+    },
+    "files": {
+      "description": "Comma-separated list of files this reviewer should focus on",
+      "default": "all changed files"
+    },
+    "diff": {
+      "description": "The diff content to review (passed from triage to avoid re-fetching)",
+      "default": ""
+    }
+  },
+  "steps": [
+    {
+      "id": "review",
+      "title": "[review-{{pr}}] {{agent}}: {{focus}}",
+      "type": "task",
+      "description": "Run {{agent}} against PR {{pr}} in {{repo}}. Focus: {{focus}}. Files in scope: {{files}}. Report P1/P2/P3 findings with file:line references. Be concise — signal only.",
+      "labels": [
+        "agent:reviewer",
+        "reviewer:{{agent}}",
+        "model:sonnet"
+      ]
+    }
+  ]
+}

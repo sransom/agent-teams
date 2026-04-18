@@ -1,0 +1,57 @@
+{
+  "formula": "implement-arm",
+  "description": "Child formula: one implementer working on one slice of a larger feature. The explorer bonds one of these per arm it identifies. Each arm owns a non-overlapping set of files and commits in its own worktree. Not meant to be invoked directly — use full-team or lite-team.",
+  "version": 1,
+  "type": "convoy",
+  "vars": {
+    "team": {
+      "description": "Team name from the parent molecule",
+      "required": true
+    },
+    "arm": {
+      "description": "Short name for this arm (e.g. migration, api, frontend, auth-service)",
+      "required": true
+    },
+    "feature": {
+      "description": "What is being built",
+      "required": true
+    },
+    "repo": {
+      "description": "Repo directory name",
+      "required": true
+    },
+    "files": {
+      "description": "File boundaries for this arm — comma-separated paths/directories. No overlap with other arms.",
+      "required": true
+    },
+    "lint_cmd": {
+      "description": "Lint command appropriate for these files (e.g. 'npm run lint', 'deno lint', 'cargo clippy')",
+      "required": true
+    },
+    "patterns": {
+      "description": "Space-separated paths of 1-3 existing files to use as implementation patterns.",
+      "default": ""
+    },
+    "notes": {
+      "description": "Explorer's notes: what to build, key constraints, interfaces with other arms",
+      "default": ""
+    },
+    "implementer_model": {
+      "description": "Model for the implementer. Default Sonnet works out-of-the-box with Claude Code. For ~3x cost savings at similar quality, set to gpt-4o-mini (requires Codex CLI installed) — the implementer agent auto-delegates to `codex exec` when this is set to a gpt-* model.",
+      "default": "sonnet"
+    }
+  },
+  "steps": [
+    {
+      "id": "implement",
+      "title": "[{{team}}] implement-{{arm}}: {{feature}}",
+      "type": "task",
+      "description": "Implement {{arm}} portion of {{feature}}. Repo: {{repo}}. File boundaries: {{files}}. Lint: {{lint_cmd}}. Patterns to follow: {{patterns}}. Notes from explorer: {{notes}}. Model: {{implementer_model}}. If model is a gpt-* id, agent delegates to `codex exec` in the worktree; otherwise implements directly with Claude tools. Commits with HUSKY=0 (or repo equivalent). Does not push.",
+      "labels": [
+        "agent:implementer",
+        "model:{{implementer_model}}",
+        "arm:{{arm}}"
+      ]
+    }
+  ]
+}
