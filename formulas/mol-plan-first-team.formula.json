@@ -71,9 +71,7 @@
         "model:sonnet"
       ],
       "waits_for": "all-children",
-      "needs": [
-        "explore"
-      ]
+      "needs": []
     },
     {
       "id": "test",
