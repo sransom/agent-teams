@@ -1,5 +1,43 @@
 # agent-teams
 
+```
+     █████╗  ██████╗ ███████╗███╗   ██╗████████╗
+    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
+    ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
+    ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║
+    ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
+    ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝
+         ████████╗███████╗ █████╗ ███╗   ███╗███████╗
+         ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║██╔════╝
+            ██║   █████╗  ███████║██╔████╔██║███████╗
+            ██║   ██╔══╝  ██╔══██║██║╚██╔╝██║╚════██║
+            ██║   ███████╗██║  ██║██║ ╚═╝ ██║███████║
+            ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝
+
+                     ┌───────────┐
+                     │   /spawn  │   ← the lead (you, Opus)
+                     └─────┬─────┘
+                           │
+           ┌───────────────┼───────────────┐
+           ▼               ▼               ▼
+       ┌───────┐       ┌───────┐       ┌───────┐
+       │  map  │       │ build │       │  gate │
+       │  🔍   │       │  🔨   │       │  ⚖️   │
+       └───────┘       └───────┘       └───────┘
+        explorer      implementers      judge
+        (haiku)    (sonnet / gpt-*)    (sonnet)
+                           │
+                 ┌─────────┼─────────┐
+                 ▼         ▼         ▼
+              ┌─────┐   ┌─────┐   ┌─────┐
+              │tests│   │rvw  │   │codex│
+              └─────┘   └─────┘   └─────┘
+                           │
+                     ┌─────▼─────┐
+                     │ integrate │
+                     └───────────┘
+```
+
 Parallel, worktree-isolated agent teams for [Claude Code](https://docs.claude.com/en/docs/claude-code). Ship a feature by spawning a coordinated team — an explorer maps the codebase and splits the work, implementer agents build in parallel in isolated worktrees, a judge gates merges, reviewers report findings, and the orchestrator integrates and pushes.
 
 Built on top of Claude Code subagents and the [beads](https://github.com/steveyegge/beads) issue tracker.
