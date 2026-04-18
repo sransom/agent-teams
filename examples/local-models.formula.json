@@ -1,0 +1,85 @@
+{
+  "formula": "local-models-team",
+  "description": "Example: run implementer arms against a local model (Ollama + aider) instead of Claude or Codex. Slower but $0 per run. Useful for experiments, offline work, or cost-sensitive prototyping. Advanced — requires Ollama and aider installed. Copy this to ~/.claude/formulas/ and tweak to your setup.",
+  "version": 1,
+  "type": "convoy",
+  "vars": {
+    "team": {
+      "description": "Short kebab-case team name",
+      "required": true
+    },
+    "feature": {
+      "description": "What is being built",
+      "required": true
+    },
+    "repo": {
+      "description": "Repo directory name",
+      "required": true
+    },
+    "plan": {
+      "description": "Path to a plan file. Strongly recommended — local models need very tight specs.",
+      "default": ""
+    },
+    "lint_cmd_default": {
+      "description": "Default lint command",
+      "default": "npm run lint"
+    },
+    "base_branch": {
+      "description": "Branch to merge integration/{team} back into",
+      "required": true
+    },
+    "ollama_model": {
+      "description": "Ollama model tag for implementation. Recommend qwen2.5-coder:32b or larger for non-trivial work.",
+      "default": "qwen2.5-coder:32b"
+    }
+  },
+  "steps": [
+    {
+      "id": "explore",
+      "title": "[{{team}}] explore + decompose: {{feature}}",
+      "type": "task",
+      "description": "Map the codebase for {{feature}}. Decompose into SMALL, tightly-specified arms — local models need ~5-file bites max. Write a detailed plan file per arm at /tmp/{{team}}-{arm}-plan.md (full function signatures, exact field names, error handling). Bond one implement-arm per arm with plan_file set. Model: haiku.",
+      "labels": [
+        "agent:explorer",
+        "model:haiku"
+      ]
+    },
+    {
+      "id": "judge",
+      "title": "[{{team}}] judge: verify all implementations",
+      "type": "task",
+      "description": "Judge all implementer arms. Local models often drift from spec — be stricter on plan fidelity than you would for Claude/Codex arms. VERDICT: FAIL often means the plan was too vague; consider rewriting plan_file and re-dispatching rather than just reopening. Max 3 attempts. Model: sonnet.",
+      "labels": [
+        "agent:judge",
+        "model:sonnet"
+      ],
+      "waits_for": "all-children",
+      "needs": []
+    },
+    {
+      "id": "review",
+      "title": "[{{team}}] code-review: integration/{{team}} branch",
+      "type": "task",
+      "description": "Run code review on integration/{{team}} branch. Pay extra attention to subtle bugs — local models produce code that looks right but often has off-by-ones or wrong field names. Report P1/P2.",
+      "labels": [
+        "agent:code-reviewer",
+        "model:sonnet"
+      ],
+      "needs": [
+        "judge"
+      ]
+    },
+    {
+      "id": "integrate",
+      "title": "[{{team}}] integrate: merge arms, merge to base branch, clean up",
+      "type": "task",
+      "description": "Standard integration. Expect to fix more P1s than usual — budget for 1-2 rounds of manual fixes before the branch is shippable.",
+      "labels": [
+        "orchestrator"
+      ],
+      "needs": [
+        "review"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "_comment": "Example reviewer registry. Copy to ~/.claude/reviewer-registry.json and edit for your codebase. The code-review formula reads this file at triage time and bonds one review-arm per matched specialist (plus all 'always' reviewers). Save as .example.json here; your real registry lives at ~/.claude/reviewer-registry.json and is not tracked by agent-teams.",
+
+  "always": [
+    {
+      "agent": "code-reviewer",
+      "focus": "general correctness, security, structure"
+    }
+  ],
+
+  "conditional": [
+    {
+      "agent": "typescript-reviewer",
+      "focus": "type safety, TS idioms, naming",
+      "match": ["**/*.ts", "**/*.tsx"],
+      "exclude": ["**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "agent": "react-hooks-reviewer",
+      "focus": "hook rules, dep arrays, stale closures, effect cleanup",
+      "match": ["**/*.tsx", "**/hooks/*.ts"]
+    },
+    {
+      "agent": "sql-migration-reviewer",
+      "focus": "migration safety, locking, backfill strategy",
+      "match": ["db/migrations/**", "migrations/**", "**/*.sql"]
+    },
+    {
+      "agent": "security-sentinel",
+      "focus": "OWASP top 10, secrets, auth bypass, input validation",
+      "match": [
+        "**/auth/**",
+        "**/middleware/**",
+        "**/*login*",
+        "**/*password*",
+        "**/*session*",
+        "**/api/**"
+      ]
+    },
+    {
+      "agent": "performance-oracle",
+      "focus": "algorithmic complexity, N+1 queries, memory, scalability",
+      "match": [
+        "**/repositories/**",
+        "**/queries/**",
+        "**/*.repository.ts",
+        "**/*.query.ts"
+      ]
+    },
+    {
+      "agent": "kubernetes-manifest-reviewer",
+      "focus": "resource limits, security contexts, health probes, RBAC",
+      "match": ["**/*.yaml", "**/*.yml", "helm/**", "k8s/**"]
+    },
+    {
+      "agent": "dockerfile-reviewer",
+      "focus": "layer caching, minimal base images, secrets in ENV, user permissions",
+      "match": ["Dockerfile", "**/Dockerfile", "**/*.dockerfile"]
+    },
+    {
+      "agent": "swift-concurrency-reviewer",
+      "focus": "actor isolation, MainActor, Sendable, Task lifecycle",
+      "match": ["**/*.swift"]
+    },
+    {
+      "agent": "go-concurrency-reviewer",
+      "focus": "goroutine leaks, channel misuse, mutex correctness, context propagation",
+      "match": ["**/*.go"]
+    },
+    {
+      "agent": "python-reviewer",
+      "focus": "type safety, async correctness, mutable defaults, import structure",
+      "match": ["**/*.py"],
+      "exclude": ["**/test_*.py", "**/*_test.py"]
+    }
+  ]
+}
