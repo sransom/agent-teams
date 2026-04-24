@@ -1,17 +1,52 @@
 #!/usr/bin/env bash
 # agent-teams installer
-# Copies agents, formulas, and commands into ~/.claude/ with interactive confirmation.
+# Copies agents, formulas, and commands with interactive confirmation.
 # Idempotent: re-running won't clobber your changes without asking.
+#
+# Two modes:
+#   (default) Global install to ~/.claude/ and ~/.beads/ — available everywhere.
+#   --local   Repo-scoped install to ./.claude/ and ./.beads/ — committed with
+#             the repo so every team member (and CI) gets the same flow.
+#             Repo-local formulas override global by name.
 
 set -euo pipefail
 
 # ---------- setup ----------
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
-# beads reads formulas from ~/.beads/formulas/ (user-level, checked after
-# project-level .beads/formulas/). Agents + commands go under ~/.claude/.
-BEADS_DIR="${BEADS_DIR:-$HOME/.beads}"
+
+# Parse mode flag
+SCOPE="global"
+for arg in "$@"; do
+  case "$arg" in
+    --local) SCOPE="local" ;;
+    --global) SCOPE="global" ;;
+    -h|--help)
+      cat <<EOF
+Usage: ./install.sh [--local|--global]
+
+  (default)  Install globally to ~/.claude/ and ~/.beads/formulas/
+  --local    Install into the current directory's .claude/ and .beads/formulas/
+             (run from the repo root where you want agent-teams scoped)
+EOF
+      exit 0
+      ;;
+  esac
+done
+
+if [ "$SCOPE" = "local" ]; then
+  # Must run from a project directory — verify we're somewhere sensible
+  if [ "$(pwd)" = "$HOME" ]; then
+    printf '%s\n' "✗ --local in \$HOME would pollute your home dir. cd to a project first." >&2
+    exit 1
+  fi
+  CLAUDE_DIR="${CLAUDE_DIR:-$(pwd)/.claude}"
+  BEADS_DIR="${BEADS_DIR:-$(pwd)/.beads}"
+else
+  CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
+  BEADS_DIR="${BEADS_DIR:-$HOME/.beads}"
+fi
+
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 
 RED=$'\033[31m'
@@ -142,7 +177,27 @@ else
   warn "Skipped profiles"
 fi
 
-# ---------- CLAUDE.md routing block ----------
+# ---------- version stamp (local mode only) ----------
+
+if [ "$SCOPE" = "local" ]; then
+  VERSION_FILE="$CLAUDE_DIR/agent-teams.version"
+  INSTALLED_SHA="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+  cat > "$VERSION_FILE" <<EOF
+# agent-teams local install
+installed: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+commit:    $INSTALLED_SHA
+source:    $REPO_DIR
+EOF
+  ok "Wrote version stamp to $VERSION_FILE"
+fi
+
+# ---------- CLAUDE.md routing block (global only) ----------
+
+if [ "$SCOPE" = "local" ]; then
+  head "Skipping CLAUDE.md update (local install)"
+  say "   Local installs don't modify ~/.claude/CLAUDE.md — it's a global file."
+  say "   Add a short note about agent-teams to your repo's CLAUDE.md if you want."
+else
 
 head "CLAUDE.md model routing guidance"
 
@@ -197,6 +252,8 @@ else
   warn "Skipped CLAUDE.md update"
 fi
 
+fi  # end of SCOPE != local guard around CLAUDE.md block
+
 # ---------- done ----------
 
 head "Quick start"
@@ -213,13 +270,35 @@ cat <<EOF
   /spawn --dry-run     — pour + show DAG without dispatching agents
 
 Formulas shipped:
-  mol-full-team      Ship a feature with explorer → implementer arms → judge → test + review → integrate
-  mol-lite-team      Same as mol-full-team, minus test-writer
-  mol-code-review    Parallel specialist review of a PR
-  mol-implement-arm  (child, used by mol-full-team/mol-lite-team)
-  mol-review-arm     (child, used by mol-code-review)
+  mol-full-team        Ship a feature end-to-end
+  mol-lite-team        Same, minus test-writer
+  mol-plan-driven-team full-team with plan-checker + checkbox tracking
+  mol-code-review      Parallel specialist review of a PR
+  mol-implement-arm    (child, bonded by the explorer)
+  mol-review-arm       (child, bonded by triage)
 
 Docs: $REPO_DIR/docs/
-
-${GREEN}Installation complete.${RESET}
 EOF
+
+if [ "$SCOPE" = "local" ]; then
+cat <<EOF
+
+${BLUE}Local install notes${RESET}
+  Installed into:  $CLAUDE_DIR/  and  $BEADS_DIR/formulas/
+  Version stamp:   $CLAUDE_DIR/agent-teams.version
+
+  Commit these dirs so teammates + CI get the same flow:
+    git add .claude/ .beads/formulas/
+    git commit -m "chore: install agent-teams locally"
+
+  Repo-local formulas override global by name (verified against bd 1.0.2).
+  Files-unchanged formulas fall through to your global ~/.beads/formulas/.
+
+${GREEN}Local installation complete.${RESET}
+EOF
+else
+cat <<EOF
+
+${GREEN}Global installation complete.${RESET}
+EOF
+fi

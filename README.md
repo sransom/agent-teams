@@ -61,6 +61,8 @@ agent-teams gives you:
 
 ## Install
 
+### Global (available everywhere)
+
 ```bash
 git clone https://github.com/sransom/agent-teams.git
 cd agent-teams
@@ -69,15 +71,32 @@ cd agent-teams
 
 The installer will:
 1. Check for `claude` (required), `bd` (required for orchestration), `codex` (optional)
-2. Copy **agents** (5) and **commands** (2) into `~/.claude/` — where Claude Code reads them
-3. Copy **formulas** (5) into `~/.beads/formulas/` — where beads reads them
+2. Copy **agents** (6) and **commands** (2) into `~/.claude/` — where Claude Code reads them
+3. Copy **formulas** (6) into `~/.beads/formulas/` — where beads reads them
 4. Copy **profiles** (8 stack conventions) into `~/.claude/agent-teams-profiles/`
 5. Back up anything it would overwrite (`.bak.{timestamp}` suffix)
 6. Optionally append a model-routing block to `~/.claude/CLAUDE.md`
 
 The split reflects where each tool looks for its files. Both paths can be overridden with `CLAUDE_DIR=...` or `BEADS_DIR=...` env vars if your setup differs.
 
-To remove: `./uninstall.sh`. It asks before deleting modified files and cleans its CLAUDE.md block.
+### Local (scoped to one repo)
+
+Install into a specific project so every teammate (and CI) gets the same flow:
+
+```bash
+cd ~/projects/my-app
+~/projects/agent-teams/install.sh --local
+git add .claude/ .beads/formulas/
+git commit -m "chore: install agent-teams locally"
+```
+
+This writes to `./.claude/` and `./.beads/formulas/` instead of the home-dir globals. Repo-local formulas and agents **override global** by name (verified against `bd 1.0.2` and Claude Code's file-discovery order), so a team can pin a custom `mol-full-team` variant without touching any teammate's global install.
+
+Files not present locally fall through to the global install — so you only commit what you actually customize.
+
+A version stamp at `.claude/agent-teams.version` records the commit SHA that was installed, so future upgrades can diff.
+
+To remove: `./uninstall.sh` (global) or `rm -rf .claude/agents .claude/commands .claude/agent-teams-profiles .beads/formulas` (local).
 
 ### Requirements
 
