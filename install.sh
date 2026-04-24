@@ -17,17 +17,22 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Parse mode flag
 SCOPE="global"
+DRY_RUN=0
 for arg in "$@"; do
   case "$arg" in
     --local) SCOPE="local" ;;
     --global) SCOPE="global" ;;
+    --dry-run) DRY_RUN=1 ;;
     -h|--help)
       cat <<EOF
-Usage: ./install.sh [--local|--global]
+Usage: ./install.sh [--local|--global] [--dry-run]
 
   (default)  Install globally to ~/.claude/ and ~/.beads/formulas/
   --local    Install into the current directory's .claude/ and .beads/formulas/
              (run from the repo root where you want agent-teams scoped)
+  --dry-run  Show what would be copied/overwritten without touching disk.
+             Composes orthogonally with --local. Skips version stamp and
+             CLAUDE.md modification entirely.
 EOF
       exit 0
       ;;
@@ -126,7 +131,11 @@ copy_dir() {
   local src="$REPO_DIR/$src_name"
   local dst="${dst_override:-$CLAUDE_DIR/$src_name}"
 
-  mkdir -p "$dst"
+  if [ "$DRY_RUN" -eq 1 ]; then
+    [ -d "$dst" ] || say "   would create dir $dst"
+  else
+    mkdir -p "$dst"
+  fi
 
   local count=0 skipped=0 backed_up=0
   local f name target
@@ -137,14 +146,27 @@ copy_dir() {
 
     if [ -e "$target" ]; then
       if cmp -s "$f" "$target"; then
+        if [ "$DRY_RUN" -eq 1 ]; then
+          say "   would skip $target (unchanged)"
+        fi
         skipped=$((skipped + 1))
         continue
       fi
-      cp "$target" "$target.bak.$TIMESTAMP"
+      if [ "$DRY_RUN" -eq 1 ]; then
+        say "   would overwrite $target (backup: $target.bak.$TIMESTAMP)"
+      else
+        cp "$target" "$target.bak.$TIMESTAMP"
+      fi
       backed_up=$((backed_up + 1))
+    else
+      if [ "$DRY_RUN" -eq 1 ]; then
+        say "   would copy $f -> $target (new)"
+      fi
     fi
 
-    cp "$f" "$target"
+    if [ "$DRY_RUN" -eq 0 ]; then
+      cp "$f" "$target"
+    fi
     count=$((count + 1))
   done
 
@@ -159,7 +181,7 @@ else
   warn "Skipped agents"
 fi
 
-if ask_yn "Install 5 formulas into $BEADS_DIR/formulas/?" y; then
+if ask_yn "Install 6 formulas into $BEADS_DIR/formulas/?" y; then
   copy_dir formulas "Formulas" "$BEADS_DIR/formulas"
 else
   warn "Skipped formulas"
@@ -179,7 +201,7 @@ fi
 
 # ---------- version stamp (local mode only) ----------
 
-if [ "$SCOPE" = "local" ]; then
+if [ "$SCOPE" = "local" ] && [ "$DRY_RUN" -eq 0 ]; then
   VERSION_FILE="$CLAUDE_DIR/agent-teams.version"
   INSTALLED_SHA="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
   cat > "$VERSION_FILE" <<EOF
@@ -189,6 +211,8 @@ commit:    $INSTALLED_SHA
 source:    $REPO_DIR
 EOF
   ok "Wrote version stamp to $VERSION_FILE"
+elif [ "$SCOPE" = "local" ] && [ "$DRY_RUN" -eq 1 ]; then
+  say "   would write version stamp to $CLAUDE_DIR/agent-teams.version (skipped in dry-run)"
 fi
 
 # ---------- CLAUDE.md routing block (global only) ----------
@@ -197,6 +221,9 @@ if [ "$SCOPE" = "local" ]; then
   head "Skipping CLAUDE.md update (local install)"
   say "   Local installs don't modify ~/.claude/CLAUDE.md — it's a global file."
   say "   Add a short note about agent-teams to your repo's CLAUDE.md if you want."
+elif [ "$DRY_RUN" -eq 1 ]; then
+  head "Skipping CLAUDE.md update (dry-run)"
+  say "   Dry-run does not modify $CLAUDE_DIR/CLAUDE.md."
 else
 
 head "CLAUDE.md model routing guidance"
@@ -252,7 +279,7 @@ else
   warn "Skipped CLAUDE.md update"
 fi
 
-fi  # end of SCOPE != local guard around CLAUDE.md block
+fi  # end of SCOPE != local / DRY_RUN guard around CLAUDE.md block
 
 # ---------- done ----------
 

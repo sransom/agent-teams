@@ -2,12 +2,48 @@
 # agent-teams uninstaller
 # Removes the files installed by install.sh. Preserves user-modified files
 # unless explicitly confirmed.
+#
+# Two modes:
+#   (default) Global uninstall from ~/.claude/ and ~/.beads/.
+#   --local   Repo-scoped uninstall from $(pwd)/.claude/ and $(pwd)/.beads/.
+#             Symmetric to `install.sh --local`. NEVER touches CLAUDE.md.
 
 set -euo pipefail
 
+# ---------- setup ----------
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
-BEADS_DIR="${BEADS_DIR:-$HOME/.beads}"
+
+# Parse mode flag
+SCOPE="global"
+for arg in "$@"; do
+  case "$arg" in
+    --local) SCOPE="local" ;;
+    --global) SCOPE="global" ;;
+    -h|--help)
+      cat <<EOF
+Usage: ./uninstall.sh [--local|--global]
+
+  (default)  Uninstall globally from ~/.claude/ and ~/.beads/formulas/
+  --local    Uninstall from the current directory's .claude/ and .beads/formulas/
+             (symmetric to \`install.sh --local\`; NEVER touches CLAUDE.md)
+EOF
+      exit 0
+      ;;
+  esac
+done
+
+if [ "$SCOPE" = "local" ]; then
+  if [ "$(pwd)" = "$HOME" ]; then
+    printf '%s\n' "✗ --local in \$HOME would walk your home dir. cd to a project first." >&2
+    exit 1
+  fi
+  CLAUDE_DIR="${CLAUDE_DIR:-$(pwd)/.claude}"
+  BEADS_DIR="${BEADS_DIR:-$(pwd)/.beads}"
+else
+  CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
+  BEADS_DIR="${BEADS_DIR:-$HOME/.beads}"
+fi
 
 RED=$'\033[31m'
 GREEN=$'\033[32m'
@@ -67,12 +103,29 @@ remove_if_shipped() {
   rmdir "$dst" 2>/dev/null && ok "Removed empty dir $dst" || true
 }
 
-head "Removing shipped files"
+head "Removing shipped files (scope: $SCOPE)"
 
 remove_if_shipped agents "Agents"
 remove_if_shipped formulas "Formulas" "$BEADS_DIR/formulas"
 remove_if_shipped commands "Commands"
 remove_if_shipped profiles "Profiles" "$CLAUDE_DIR/agent-teams-profiles"
+
+if [ "$SCOPE" = "local" ]; then
+  # Local mode: also remove the version stamp written by `install.sh --local`.
+  # Never touch CLAUDE.md in local mode — it's the user's repo file.
+  VERSION_FILE="$CLAUDE_DIR/agent-teams.version"
+  if [ -e "$VERSION_FILE" ]; then
+    rm "$VERSION_FILE"
+    ok "Removed $VERSION_FILE"
+  fi
+  head "Local uninstall complete"
+  say ""
+  say "Did NOT touch $CLAUDE_DIR/CLAUDE.md (your repo's file)."
+  say "If you committed .claude/ and .beads/formulas/, run:"
+  say "  git add -u .claude/ .beads/formulas/"
+  say "  git commit -m \"chore: uninstall agent-teams locally\""
+  exit 0
+fi
 
 head "CLAUDE.md cleanup"
 
