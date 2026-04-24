@@ -47,9 +47,7 @@
         "model:sonnet"
       ],
       "waits_for": "all-children",
-      "needs": [
-        "triage"
-      ]
+      "needs": []
     }
   ]
 }
