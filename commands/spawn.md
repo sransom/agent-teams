@@ -622,6 +622,172 @@ Always spawn parallel tasks in a single message with multiple Agent tool calls.
 
 ---
 
+## Abandoning a team run
+
+`/spawn --abandon {team} [--force]` is the escape hatch for a team run that broke mid-way and the user wants to clean up beads state, worktrees, and branches **without shipping anything**. This is destructive — nothing is preserved beyond what's already been pushed to a remote.
+
+```bash
+/spawn --abandon {team}            # interactive, with confirmation prompt
+/spawn --abandon {team} --force    # skip the prompt, still honors safety rules
+```
+
+`--force` skips the confirmation prompt **only**. It does NOT bypass the safety rules below — those always apply. The only way past a safety trip is to fix the underlying condition (push the branch back to local-only, or merge the integration branch).
+
+### When to use it
+
+- Explorer crashed before bonding arms; beads has a half-built epic.
+- An implementer's worktree is in a bad state and you'd rather start over than salvage.
+- You changed your mind about the feature and want the team's scaffolding gone before it confuses the next run.
+- A judge retry loop hit attempt 3 and you want to reset rather than escalate.
+
+If the team **already shipped** (integration branch pushed, base branch merged), do NOT use `--abandon`. That work is done; just close any leftover beads issues by hand.
+
+### Step 1 — Discover everything that belongs to the team
+
+Run these in order. Capture the results into local variables for the preview step:
+
+```bash
+TEAM={team}
+BASE_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)
+# If the user passed --base or the team was poured against a non-default base,
+# use that instead. The default base only matters for the Rule 2 check below.
+
+# 1. Open beads issues whose title contains [{team}]
+ISSUES=$(bd list --status=open --json | jq -r \
+  --arg t "[$TEAM]" '.[] | select(.title | contains($t)) | .id')
+
+# 2. Worktrees named {team}-* (path basename match)
+WORKTREES=$(git worktree list --porcelain | awk '/^worktree / {print $2}' | \
+  grep -E "/${TEAM}-[^/]+$" || true)
+
+# 3. Local branches: agent/{team}/* and integration/{team}
+AGENT_BRANCHES=$(git branch --list "agent/${TEAM}/*" | sed 's/^[* ] *//')
+INTEGRATION_BRANCH=$(git branch --list "integration/${TEAM}" | sed 's/^[* ] *//')
+ALL_BRANCHES=$(printf '%s\n%s\n' "$AGENT_BRANCHES" "$INTEGRATION_BRANCH" | grep -v '^$' || true)
+```
+
+Discovery order matters: issues first (cheapest, most visible), then worktrees, then branches. If any step errors out (e.g. `bd` is unavailable), abort with a clear message — partial discovery is worse than none.
+
+### Step 2 — Run the safety rules (BOTH must pass)
+
+Both rules below run **before any preview is shown** and **before any destructive op**. If either trips, abort the entire abandon — do not touch beads, worktrees, or branches. Print which rule fired, exactly which branch or commit tripped it, and the specific resolution.
+
+#### Rule 1 — No remote-tracked branches
+
+NEVER delete a branch that's been pushed to a remote. Pushed work is intentional and may be referenced by PRs, other clones, or backups. Check both branch families:
+
+```bash
+REMOTE_AGENT=$(git branch -r | grep -E "origin/agent/${TEAM}/" || true)
+REMOTE_INTEGRATION=$(git branch -r | grep -E "origin/integration/${TEAM}$" || true)
+
+if [ -n "$REMOTE_AGENT$REMOTE_INTEGRATION" ]; then
+  echo "ABORT: --abandon refuses to touch branches that exist on a remote."
+  echo "Tripped by:"
+  echo "$REMOTE_AGENT$REMOTE_INTEGRATION"
+  echo ""
+  echo "Resolution: delete the remote branch first, then re-run --abandon:"
+  echo "  git push origin --delete <branch>"
+  exit 1
+fi
+```
+
+#### Rule 2 — Integration branch has no unmerged commits
+
+NEVER delete `integration/{team}` if it has commits not on `{base_branch}`. Those commits are real work that hasn't been integrated; abandoning would silently destroy them.
+
+```bash
+if [ -n "$INTEGRATION_BRANCH" ]; then
+  UNMERGED=$(git log "${BASE_BRANCH}..integration/${TEAM}" --oneline 2>/dev/null || true)
+  if [ -n "$UNMERGED" ]; then
+    echo "ABORT: integration/${TEAM} has commits not on ${BASE_BRANCH}:"
+    echo "$UNMERGED"
+    echo ""
+    echo "Resolution (pick one):"
+    echo "  - Merge integration/${TEAM} to ${BASE_BRANCH} first, then re-run --abandon."
+    echo "  - If the work is truly abandoned, discard the branch manually:"
+    echo "      git branch -D integration/${TEAM}"
+    echo "    then re-run --abandon to clean up the rest."
+    exit 1
+  fi
+fi
+```
+
+**All-or-nothing.** A safety trip aborts the whole flow — no partial cleanup, no "skip the offending item and keep going." The user must fix the tripped condition or manually undo it before `/spawn --abandon` will proceed. Rationale: abandon is destructive; a tripped rule means the user may not have full context, so bail hard and make them look.
+
+### Step 3 — Preview
+
+Once both safety rules pass, print a preview summarizing exactly what will happen:
+
+```
+/spawn --abandon {team} will:
+  - close N open beads issues
+  - remove M worktrees:
+      /path/to/{team}-explorer
+      /path/to/{team}-impl-foo
+      /path/to/{team}-impl-bar
+  - delete K branches:
+      agent/{team}/explorer
+      agent/{team}/impl-foo
+      agent/{team}/impl-bar
+      integration/{team}
+
+Proceed? [y/N]
+```
+
+Counts come from the lists captured in Step 1. Always show full paths for worktrees and full names for branches — never just counts. Empty lists print `(none)` rather than being omitted; the user should see exactly what was discovered.
+
+When `--force` is passed, **skip the prompt** and proceed straight to Step 4. The preview is still printed for the run log, but no input is solicited.
+
+### Step 4 — Execute the cleanup
+
+On a `y` (or `--force`), run the destructive ops in this order. Order matters: closing issues first means a mid-flight error still leaves beads in a clean state; removing worktrees before deleting their branches avoids the "branch is checked out" error.
+
+```bash
+# 1. Close every open beads issue belonging to the team
+for id in $ISSUES; do
+  bd close "$id" --reason "abandoned by /spawn --abandon"
+done
+
+# 2. Remove every worktree (force, since the user already confirmed)
+for wt in $WORKTREES; do
+  git worktree remove --force "$wt"
+done
+
+# 3. Delete every agent branch, then integration/{team}
+for b in $AGENT_BRANCHES; do
+  git branch -D "$b"
+done
+if [ -n "$INTEGRATION_BRANCH" ]; then
+  git branch -D "integration/${TEAM}"
+fi
+```
+
+If any individual command fails (e.g. a worktree is locked, a branch is somehow already gone), log the error and continue — by this point the user has confirmed the cleanup is what they want, and partial completion is better than a half-aborted state. Report any per-item errors in the final summary.
+
+### Step 5 — Summary
+
+Print a concise final summary:
+
+```
+Abandoned: N issues closed, M worktrees removed, K branches deleted.
+```
+
+If anything failed in Step 4, append a `Warnings:` block listing each failure. Exit zero if the discovery + safety + preview phases all succeeded, regardless of per-item Step 4 errors — the abandon as a whole completed.
+
+### Anything not cleaned up
+
+`--abandon` deliberately does NOT touch:
+
+- `~/.claude/plans/` files (plans are user content)
+- The repo's `{base_branch}` (never modified by abandon)
+- Pushed remote branches (Rule 1)
+- Beads issues whose titles don't contain `[{team}]`
+- Other teams' worktrees or branches
+
+If the user wants any of those cleaned up, they do it by hand. `--abandon` is intentionally narrow.
+
+---
+
 ## Rules
 
 - Never push until the `integrate` step — worktree commits only
