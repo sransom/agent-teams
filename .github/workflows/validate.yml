@@ -1,0 +1,29 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Bash syntax check (install.sh, uninstall.sh)
+        run: bash -n install.sh uninstall.sh
+
+      - name: Validate formulas
+        run: python3 scripts/validate-formulas.py formulas/ examples/
+
+      - name: YAML lint workflow file
+        run: |
+          python3 -c "import yaml; yaml.safe_load(open('.github/workflows/validate.yml'))"
