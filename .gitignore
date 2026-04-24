@@ -3,3 +3,11 @@
 .dolt/
 *.db
 .beads-credential-key
+# Auto-exported by beads pre-commit hook in consumer repos — not meaningful here
+.beads/issues.jsonl
+# Artifacts from `./install.sh --local` when run inside agent-teams itself (dogfooding)
+/.claude/agents/
+/.claude/commands/
+/.claude/agent-teams-profiles/
+/.claude/agent-teams.version
+/.beads/formulas/
