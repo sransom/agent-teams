@@ -1,0 +1,130 @@
+{
+  "formula": "mol-plan-driven-team",
+  "description": "Same as mol-full-team with a plan-check step prepended and a plan-update step appended. Plan-checker verifies the plan is concrete enough to execute and writes a refined sidecar if needed. At integration, the orchestrator ticks checkboxes in the plan file for work that got done. Use when your plan is long, multi-milestone, or still rough.",
+  "version": 1,
+  "type": "convoy",
+  "vars": {
+    "team": {
+      "description": "Short kebab-case team name (e.g. auth-refactor)",
+      "required": true
+    },
+    "feature": {
+      "description": "What is being built — be specific enough for the explorer to decompose",
+      "required": true
+    },
+    "repo": {
+      "description": "Repo directory name (e.g. my-app)",
+      "required": true
+    },
+    "plan": {
+      "description": "Path to a plan file (required for this formula — it's the whole point). Should contain milestones, ideally as - [ ] checkboxes. Plan-checker will refine it to a .refined.md sidecar if gaps are found.",
+      "required": true
+    },
+    "lint_cmd_default": {
+      "description": "Default lint command. /spawn sets this from the detected stack profile. Leave empty to have explorer pick per arm.",
+      "default": ""
+    },
+    "base_branch": {
+      "description": "The branch to merge integration/{team} back into after all work is done (e.g. main, develop, feature/xyz)",
+      "required": true
+    },
+    "implementer_model": {
+      "description": "Model for implementer arms. Default sonnet. For ~3x savings, set to gpt-4o-mini (requires Codex CLI).",
+      "default": "sonnet"
+    },
+    "use_refined_plan": {
+      "description": "If plan-checker produces a .refined.md sidecar, use that instead of the original (true) or stop for user approval first (false). Default false — safer.",
+      "default": "false"
+    }
+  },
+  "steps": [
+    {
+      "id": "plan-check",
+      "title": "[{{team}}] plan-check: verify {{plan}} is ready to execute",
+      "type": "task",
+      "description": "Read the plan at {{plan}}. Check for concrete problem statement, verifiable milestones (prefer - [ ] checkboxes), specific file paths and signatures, missing pieces (error handling, tests, auth), and stack fit. Produce PLAN_VERDICT: PASS / REFINED / NEEDS_REVISION. On REFINED, write {{plan}}.refined.md. On NEEDS_REVISION, stop the run and return to user. SHORTCUT: if {{plan}} ends in .refined.md, return PLAN_VERDICT: PASS immediately without re-checking — it's the output of a prior plan-check and re-refining is wasted work.",
+      "labels": [
+        "agent:plan-checker",
+        "model:sonnet"
+      ]
+    },
+    {
+      "id": "explore",
+      "title": "[{{team}}] explore + decompose: {{feature}}",
+      "type": "task",
+      "description": "Map the codebase for {{feature}} using the verified plan at {{plan}} (or {{plan}}.refined.md if plan-checker produced one and use_refined_plan is true). Decompose into implementer arms with non-overlapping file boundaries. Bond one mol-implement-arm per arm. Set cross-arm dependencies in beads. Report decomposition. Model: haiku.",
+      "labels": [
+        "agent:explorer",
+        "model:haiku"
+      ],
+      "needs": [
+        "plan-check"
+      ]
+    },
+    {
+      "id": "judge",
+      "title": "[{{team}}] judge: verify all implementations",
+      "type": "task",
+      "description": "Judge all implementer arms (attempt 1 of 3). VERDICT: PASS unblocks test + review. VERDICT: FAIL → reopen failed arm(s), retry. Max 3 attempts. If a FAIL is rooted in plan ambiguity (not implementer error), flag it so the orchestrator can re-run plan-check. Model: sonnet.",
+      "labels": [
+        "agent:judge",
+        "model:sonnet"
+      ],
+      "waits_for": "all-children",
+      "needs": []
+    },
+    {
+      "id": "test",
+      "title": "[{{team}}] test-writer: write tests for {{feature}}",
+      "type": "task",
+      "description": "Write colocated tests for all new source files across all arms. Run the repo's test command and confirm tests pass. Model: haiku.",
+      "labels": [
+        "agent:test-writer",
+        "model:haiku"
+      ],
+      "needs": [
+        "judge"
+      ]
+    },
+    {
+      "id": "review",
+      "title": "[{{team}}] code-review: integration/{{team}} branch",
+      "type": "task",
+      "description": "Run code review on integration/{{team}} branch. Report P1/P2 findings. Model: sonnet.",
+      "labels": [
+        "agent:code-reviewer",
+        "model:sonnet"
+      ],
+      "needs": [
+        "judge"
+      ]
+    },
+    {
+      "id": "codex-review",
+      "title": "[{{team}}] codex-review: correctness + spec-adherence pass on integration/{{team}}",
+      "type": "task",
+      "description": "Run Codex CLI against the changed files for mechanical correctness (wrong fields, missing null checks, off-by-one). Report P1/P2. Do NOT edit files. Skip gracefully if codex is not installed.",
+      "labels": [
+        "agent:codex-reviewer",
+        "model:gpt-4o-mini"
+      ],
+      "needs": [
+        "judge"
+      ]
+    },
+    {
+      "id": "integrate",
+      "title": "[{{team}}] integrate: merge arms, merge to base branch, tick plan, clean up",
+      "type": "task",
+      "description": "1. Create integration/{{team}}, merge all arm + test-writer branches into it. 2. Fix P1 findings from both reviewers. 3. Update the plan: for every milestone in {{plan}} (or the refined version) that got shipped by this team, tick its - [ ] checkbox to - [x]. Append a '## Progress log' entry with team name, date, arms, and linked commits. 4. Push integration/{{team}} to origin. 5. Merge into base branch, push. 6. Delete branches + worktrees. 7. Close remaining open beads issues.",
+      "labels": [
+        "orchestrator"
+      ],
+      "needs": [
+        "test",
+        "review",
+        "codex-review"
+      ]
+    }
+  ]
+}

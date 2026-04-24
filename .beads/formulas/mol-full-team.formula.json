@@ -1,0 +1,113 @@
+{
+  "formula": "mol-full-team",
+  "description": "Ship a feature end-to-end with a parallel agent team. An explorer splits the work into non-overlapping implementer arms, a judge gates merges, then a test-writer and code-reviewers run in parallel before the orchestrator integrates and pushes. Use for production work.",
+  "version": 1,
+  "type": "convoy",
+  "vars": {
+    "team": {
+      "description": "Short kebab-case team name (e.g. auth-refactor)",
+      "required": true
+    },
+    "feature": {
+      "description": "What is being built — be specific enough for the explorer to decompose",
+      "required": true
+    },
+    "repo": {
+      "description": "Repo directory name (e.g. my-app)",
+      "required": true
+    },
+    "plan": {
+      "description": "Path to a plan file or description of what to build. Explorer reads this first.",
+      "default": ""
+    },
+    "lint_cmd_default": {
+      "description": "Default lint command. /spawn sets this from the detected stack profile (e.g. 'npm run lint' for nextjs-ts, 'go vet ./...' for go, 'cargo clippy' for rust). Leave empty and the explorer will pick one per arm from inspecting the repo.",
+      "default": ""
+    },
+    "base_branch": {
+      "description": "The branch to merge integration/{team} back into after all work is done (e.g. main, develop, feature/xyz)",
+      "required": true
+    },
+    "implementer_model": {
+      "description": "Model for implementer arms. Default Sonnet works out-of-the-box. For ~3x cost savings at similar quality, set to gpt-4o-mini (requires Codex CLI). The explorer passes this through when bonding arms.",
+      "default": "sonnet"
+    }
+  },
+  "steps": [
+    {
+      "id": "explore",
+      "title": "[{{team}}] explore + decompose: {{feature}}",
+      "type": "task",
+      "description": "Map the codebase for {{feature}}. Decompose into implementer arms with non-overlapping file boundaries. Bond one implement-arm per arm. Set cross-arm dependencies in beads where arm B needs arm A's output. Report decomposition to orchestrator. Model: haiku.",
+      "labels": [
+        "agent:explorer",
+        "model:haiku"
+      ]
+    },
+    {
+      "id": "judge",
+      "title": "[{{team}}] judge: verify all implementations",
+      "type": "task",
+      "description": "Judge all implementer arms (attempt 1 of 3). VERDICT: PASS unblocks test + review. VERDICT: FAIL → reopen failed arm(s), retry. Max 3 attempts. Model: sonnet.",
+      "labels": [
+        "agent:judge",
+        "model:sonnet"
+      ],
+      "waits_for": "all-children",
+      "needs": []
+    },
+    {
+      "id": "test",
+      "title": "[{{team}}] test-writer: write tests for {{feature}}",
+      "type": "task",
+      "description": "Write colocated tests for all new source files across all arms. Run the repo's test command (vitest, jest, deno test, pytest, etc.) and confirm tests pass. Model: haiku.",
+      "labels": [
+        "agent:test-writer",
+        "model:haiku"
+      ],
+      "needs": [
+        "judge"
+      ]
+    },
+    {
+      "id": "review",
+      "title": "[{{team}}] code-review: integration/{{team}} branch",
+      "type": "task",
+      "description": "Run code review on integration/{{team}} branch. Report P1/P2 findings to orchestrator. Model: sonnet.",
+      "labels": [
+        "agent:code-reviewer",
+        "model:sonnet"
+      ],
+      "needs": [
+        "judge"
+      ]
+    },
+    {
+      "id": "codex-review",
+      "title": "[{{team}}] codex-review: correctness + spec-adherence pass on integration/{{team}}",
+      "type": "task",
+      "description": "Run Codex CLI (gpt-4o-mini) against the changed files on integration/{{team}} branch. Review for: correctness (wrong variables, missing fields), spec adherence, missing edge cases, obvious bugs. Report P1/P2. Do NOT edit files. Runs in parallel with code-review. Model: gpt-4o-mini (Codex CLI). Skip this step gracefully if codex is not installed.",
+      "labels": [
+        "agent:codex-reviewer",
+        "model:gpt-4o-mini"
+      ],
+      "needs": [
+        "judge"
+      ]
+    },
+    {
+      "id": "integrate",
+      "title": "[{{team}}] integrate: merge arms, merge to base branch, clean up",
+      "type": "task",
+      "description": "1. Create integration/{{team}}, merge all arm + test-writer branches into it. 2. Fix P1 findings from code-review AND codex-review. 3. Push integration/{{team}} to origin. 4. Checkout base branch, merge integration/{{team}} into it, push base branch. 5. Delete all agent/{{team}}/* and integration/{{team}} local branches. 6. Remove all worktrees with bd worktree remove. 7. Close remaining open beads issues.",
+      "labels": [
+        "orchestrator"
+      ],
+      "needs": [
+        "test",
+        "review",
+        "codex-review"
+      ]
+    }
+  ]
+}
