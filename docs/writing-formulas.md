@@ -137,9 +137,11 @@ When one of your steps bonds additional issues at runtime (like the explorer bon
 }
 ```
 
-This tells beads: "don't become ready until every issue that was bonded under the parent molecule is closed, including any that got bonded after the pour."
+This tells the orchestrator: "don't become ready until every issue that was bonded under the parent molecule is closed, including any that got bonded after the pour."
 
-Rule of thumb: if a step upstream uses `bd mol bond` in its spawn prompt, the next gating step needs `all-children`.
+**Important**: `waits_for` is metadata, not a beads-enforced blocker. `bd mol bond` attaches children but does NOT auto-wire blocking deps from each child to this step. The orchestrator (`/spawn`) is responsible for running `bd dep add {gated-step} {arm}` after every bond — default dep type `blocks` is what makes `bd ready` actually gate the step. See `commands/spawn.md` "wire `waits_for: all-children` as real beads deps after bonding."
+
+Rule of thumb: if a step upstream uses `bd mol bond` in its spawn prompt, the next gating step needs `all-children` — AND the orchestrator must `bd dep add` each bonded arm to it before moving on.
 
 ---
 

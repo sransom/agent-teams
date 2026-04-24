@@ -67,21 +67,30 @@ After bonding, the explorer closes its own issue. beads now contains an expanded
 
 ---
 
-## Why `waits_for: all-children` (and who enforces it)
+## Why `waits_for: all-children` (and how to wire it)
 
 Most workflow engines require a static DAG. agent-teams needs dynamic fanout: the explorer doesn't know at pour time how many arms there will be, because that depends on what it finds.
 
 `waits_for: all-children` on a step is the formula's declaration that "this step shouldn't run until every issue that gets bonded under the parent epic is closed." The judge can't run until every implementer arm the explorer created is done.
 
-**Important — beads does NOT enforce this automatically.** `bd ready` will return a step with `waits_for: all-children` as ready immediately after pour, even though no children have been bonded yet. The declaration is a signal to the orchestrator, not a beads-level blocker.
+**`bd mol bond` does NOT auto-wire blocking deps.** It attaches children to the parent epic, but no edge is created from each child to the gated step. That's why `bd ready` will surface the judge immediately after pour — even with zero arms built.
 
-The orchestrator (the Claude Code lead running `/spawn`) is responsible for:
+**The fix: explicit `bd dep add` calls after every bond.** The formula's `waits_for` field tells the orchestrator *which* step needs gating; the orchestrator wires the actual deps:
 
-1. Recognizing when a step has `waits_for: all-children` and **not** claiming it from `bd ready`
-2. Dispatching the upstream decomposing step (explorer, triage) first
-3. Waiting for all bonded children to close before claiming the gated step
+```bash
+# After the explorer's bonds execute:
+for gated in $GATED_STEP_IDS; do      # steps with waits_for: all-children
+  for arm in $ARM_IDS; do              # newly-bonded arm root IDs
+    bd dep add "$gated" "$arm"         # default type: blocks
+  done
+done
+```
 
-This is why `/spawn.md` has a "CRITICAL: enforce `waits_for: all-children` yourself" section. If the orchestrator skips this check, the judge will fire on an empty tree.
+Now `bd ready` correctly gates the judge until the last arm closes. No polling, no "skip this ready task" special cases.
+
+Source: beads `docs/MOLECULES.md` "Christmas Ornament" pattern. The `bd mol bond` form attaches; explicit `bd dep add` wires. Formula `waits_for` is metadata for the orchestrator, not a beads-enforced blocker on its own.
+
+See `commands/spawn.md` under "CRITICAL: wire `waits_for: all-children` as real beads deps after bonding" for the full dispatch sequence.
 
 ## How bonding works in practice
 

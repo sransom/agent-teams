@@ -392,18 +392,38 @@ This means the orchestrator must:
 2. **Dispatch arms by ID directly**, not by polling `bd ready`. Use `bd show {arm-id}` to confirm status before dispatch.
 3. **Poll arm closure**: after dispatching, check each arm's status with `bd show {arm-id}` until all are `closed`. Do not rely on `bd ready` to signal completion.
 
-#### CRITICAL: enforce `waits_for: all-children` yourself
+#### CRITICAL: wire `waits_for: all-children` as real beads deps after bonding
 
-`bd ready` returns the judge (or any step with `waits_for: all-children`) as ready **immediately** — beads does NOT block it until bonded children exist and close. That's an orchestrator responsibility.
+`waits_for: all-children` in a formula is **just a declaration** — `bd mol pour` and `bd mol bond` do NOT create deps from bonded children to the gated step automatically. Without explicit wiring, `bd ready` returns the gated step (e.g. the judge) as ready immediately, before any arms have been built.
 
-When the formula declares `waits_for: all-children` on a step, you must:
+**Fix: after every `bd mol bond` run, wire each new arm's root issue to each gated step with `bd dep add`.**
 
-1. **Do not claim that step from `bd ready` directly.** Skip it and pick another ready task.
-2. Dispatch the upstream decomposing step (explorer / triage). Parse its report for `bd mol bond` commands and run them yourself (explorer is read-only, cannot bond).
-3. After bonding, dispatch each arm by ID. Poll `bd show {arm-id}` until all arms are closed.
-4. Only then claim and dispatch the gated step.
+```bash
+# 1. After the explorer's bonds execute, capture the new arm root IDs:
+#    Either from each `bd mol bond` output ("Spawned: N issues") or by listing
+#    the root epic's children.
+ARM_IDS=$(bd show "$ROOT_EPIC_ID" --json | jq -r \
+  '.children[] | select(.title | test("implement-")) | .id')
 
-Getting this wrong means dispatching the judge before any arms have been built — the judge will have nothing to judge and will either PASS vacuously or FAIL on missing work. Both are wrong outcomes.
+# 2. Read the formula to find every step with waits_for: all-children.
+#    These are the gated steps that must block on the new arms.
+GATED_STEP_IDS=$(bd show "$ROOT_EPIC_ID" --json | jq -r \
+  '.children[] | select(.title | test("judge|integrate")) | .id')
+# Better: match by the formula's step IDs directly — judge, integrate, etc.
+
+# 3. Wire every gated step as blocked-by every arm (default --type is "blocks"):
+for gated in $GATED_STEP_IDS; do
+  for arm in $ARM_IDS; do
+    bd dep add "$gated" "$arm"
+  done
+done
+```
+
+Now `bd ready` correctly gates those steps. When the last arm closes, the gated step becomes ready automatically — no polling, no "skip bd ready" special case.
+
+**Why we didn't do this before:** earlier docs said "the orchestrator enforces this manually." That's extra work on every run and easy to get wrong. Explicit `bd dep add` calls are the real fix. Source: beads `docs/MOLECULES.md` "Christmas Ornament" pattern — `bd mol bond` attaches children; it does not wire blocking deps. The formula's `waits_for` field is metadata for the orchestrator to know *which* deps to add, not a beads-enforced blocker on its own.
+
+**Apply the same pattern** to any other dynamic children (e.g. `mol-review-arm` bonded by the triage step for `mol-code-review` — wire each review arm to the aggregate step).
 
 #### Bond target for dynamic arms
 
