@@ -1,5 +1,5 @@
 {
-  "formula": "mol-local-models-team",
+  "formula": "mol-local-models",
   "description": "Example: run implementer arms against a local model (Ollama + aider) instead of Claude or Codex. Slower but $0 per run. Useful for experiments, offline work, or cost-sensitive prototyping. Advanced — requires Ollama and aider installed. Copy this to ~/.beads/formulas/ and tweak to your setup.",
   "version": 1,
   "type": "convoy",
