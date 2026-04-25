@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned
+- **Cost reporting (Tier 1)** — integrate step parses `<usage>` blocks from agent tool results, prints token totals grouped by model alias + approximate dollar estimate. No new dependencies, no persistence. See [`docs/cost-reporting-design.md`](docs/cost-reporting-design.md) for the full three-tier plan.
+
+### Known gaps
+- No cost / token tracking in v0.1.0. Users must check Anthropic/OpenAI dashboards post-run. Design doc is in `docs/cost-reporting-design.md`; implementation targeted for v0.2.
+- `bd mol pour` is not live-tested in CI (would require installing the beads plugin in a headless environment). `scripts/validate-formulas.py` covers the four structural traps we've actually hit; add to this as new traps surface.
+- `/spawn --abandon` is documented but not automated — the orchestrator executes the flow by reading the docs in `commands/spawn.md`.
+
 ## [0.1.0] - 2026-04-18
 
 First public-release polish pass on `sransom/agent-teams`. Establishes the
