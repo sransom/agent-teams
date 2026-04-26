@@ -168,6 +168,7 @@ Model names are family aliases (`haiku` / `sonnet` / `opus`) so they track Claud
 |-------------------|-----------------------------------------------------------------------------------------------------------------|
 | full-team         | Ship end-to-end: explorer → implementer arms → judge → test + review → integrate                                |
 | lite-team         | Same as full-team, minus test-writer. For prototypes.                                                           |
+| lite-judge-only   | Minimal: explorer → arms → judge → integrate. No test-writer, no reviewers. Fastest path with a judge gate.     |
 | plan-driven-team  | full-team with a plan-checker prepended + checkbox/progress-log update at integrate. For multi-milestone plans. |
 | code-review       | Parallel specialist reviewers. Triage picks reviewers per file type; aggregate dedupes findings.                |
 | implement-arm     | Child formula bonded by the explorer. One implementer, one slice of a feature.                                  |

@@ -299,6 +299,7 @@ cat <<EOF
 Formulas shipped:
   mol-full-team        Ship a feature end-to-end
   mol-lite-team        Same, minus test-writer
+  mol-lite-judge-only  Minimal: arms + judge + integrate (no test-writer, no reviewers)
   mol-plan-driven-team full-team with plan-checker + checkbox tracking
   mol-code-review      Parallel specialist review of a PR
   mol-implement-arm    (child, bonded by the explorer)

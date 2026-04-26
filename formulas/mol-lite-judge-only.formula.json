@@ -1,0 +1,72 @@
+{
+  "formula": "mol-lite-judge-only",
+  "description": "Minimal worktree team: explorer decomposes, implementer arms run, judge gates merges, integrate. No test-writer, no code-review. For prototypes where CI or a human handles QA but you still want a judge gate before integration.",
+  "version": 1,
+  "type": "convoy",
+  "vars": {
+    "team": {
+      "description": "Short kebab-case team name (e.g. auth-refactor)",
+      "required": true
+    },
+    "feature": {
+      "description": "What is being built — be specific enough for the explorer to decompose",
+      "required": true
+    },
+    "repo": {
+      "description": "Repo directory name",
+      "required": true
+    },
+    "plan": {
+      "description": "Path to a plan file or description of what to build. Explorer reads this first.",
+      "default": ""
+    },
+    "lint_cmd_default": {
+      "description": "Default lint command. /spawn sets this from the detected stack profile. Leave empty and the explorer will pick one per arm.",
+      "default": ""
+    },
+    "base_branch": {
+      "description": "The branch to merge integration/{team} back into after all work is done",
+      "required": true
+    },
+    "implementer_model": {
+      "description": "Model for implementer arms. Default Sonnet works out-of-the-box. For ~3x cost savings at similar quality, set to gpt-4o-mini (requires Codex CLI).",
+      "default": "sonnet"
+    }
+  },
+  "steps": [
+    {
+      "id": "explore",
+      "title": "[{{team}}] explore + decompose: {{feature}}",
+      "type": "task",
+      "description": "Map the codebase for {{feature}}. Decompose into implementer arms with non-overlapping file boundaries. Bond one implement-arm per arm. Set cross-arm dependencies in beads where arm B needs arm A's output. Report decomposition to orchestrator. Model: haiku.",
+      "labels": [
+        "agent:explorer",
+        "model:haiku"
+      ]
+    },
+    {
+      "id": "judge",
+      "title": "[{{team}}] judge: verify all implementations",
+      "type": "task",
+      "description": "Judge all implementer arms (attempt 1 of 3). VERDICT: PASS unblocks integrate. VERDICT: FAIL → reopen failed arm(s), retry. Max 3 attempts. Model: sonnet. NOTE: judge-only mode — no test-writer or reviewers.",
+      "labels": [
+        "agent:judge",
+        "model:sonnet"
+      ],
+      "waits_for": "all-children",
+      "needs": []
+    },
+    {
+      "id": "integrate",
+      "title": "[{{team}}] integrate: merge arms, merge to base branch, clean up",
+      "type": "task",
+      "description": "1. Create integration/{{team}}, merge all arm branches into it. 2. Verify build + tests on integration branch. 3. Push integration/{{team}} to origin. 4. Checkout base branch, merge integration/{{team}} into it, push base branch. 5. Delete all agent/{{team}}/* and integration/{{team}} local branches. 6. Remove all worktrees with bd worktree remove. 7. Close remaining open beads issues.",
+      "labels": [
+        "orchestrator"
+      ],
+      "needs": [
+        "judge"
+      ]
+    }
+  ]
+}
