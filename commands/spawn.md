@@ -501,6 +501,29 @@ Now `bd ready` correctly gates those steps. When the last arm closes, the gated 
 
 **Apply the same pattern** to any other dynamic children (e.g. `mol-review-arm` bonded by the triage step for `mol-code-review` — wire each review arm to the aggregate step).
 
+#### CRITICAL: sweep ghost proto beads after bonding
+
+Each `bd mol bond mol-<formula> <parent>` call prints `Spawned: 2 issues` because it creates **both**:
+
+1. **A proto bead** — title is the bare formula name (e.g. exactly `mol-implement-arm`, no team prefix, no description). This is the cooked formula instance.
+2. **The actual child step** (the one we want — e.g. `[<team>] implement-<arm>: <feature>`).
+
+The proto inherits the parent molecule's `liquid` phase, so it persists in the database. Nothing closes it automatically — the formula has no `cleanup` step, the bond doesn't auto-archive, and no agent owns it. Result: ghost protos accumulate across teams. After several `/spawn` runs `bd list --status=open` is cluttered with N copies of `mol-implement-arm`.
+
+**Fix: after the bond batch for a team is complete, sweep:**
+
+```bash
+# Close every open proto whose title is exactly a known formula name.
+# Run this once per team, after all bonds for that team have completed.
+bd list --status=open --json \
+  | jq -r '.[] | select(.title == "mol-implement-arm" or .title == "mol-review-arm") | .id' \
+  | xargs -I{} bd close {} --reason "ghost proto post-bond"
+```
+
+Add this to your post-bond cleanup right after the dep-wiring step. It's idempotent — safe to run even if there are no ghosts.
+
+**Do NOT use `--ephemeral` on bond to fix this.** That flag also marks the actual child arm as ephemeral (excluded from Dolt sync), which loses the audit trail of the implementer's work. The sweep above is the right shape.
+
 #### Bond target for dynamic arms
 
 When the explorer (or triage) bonds child molecules, target them at the **root epic**, not at the gated step:
