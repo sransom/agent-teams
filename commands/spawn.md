@@ -17,11 +17,16 @@ Explorer maps the codebase, decomposes work into implementer arms with non-overl
 /spawn --from-plan ~/plans/my-plan.md                       # feature + plan from file
 /spawn --resume                                             # pick from active teams in beads
 /spawn --resume {team-name}                                 # resume specific team
+/spawn --status                                             # peek at all active teams (no dispatch)
+/spawn --status {team-name}                                 # peek at one team
 /spawn --list                                               # show available formulas, exit
 /spawn --dry-run ...                                        # pour + show DAG, don't dispatch
 /spawn --profile go                                         # override stack detection
 /spawn --profile none                                       # skip profile injection entirely
+/spawn --foreground                                         # disable background dispatch (legacy)
 ```
+
+**Background by default.** Explorer, implementer, test-writer, and reviewer steps are dispatched with `run_in_background: true` so the main session stays free for the user. Judge and integrate stay foreground because they are decision gates the orchestrator must observe directly. Use `--foreground` to revert to the legacy "wait on every step" mode (slower for the user but easier to debug a stuck team).
 
 **Var passthrough.** Any `--var key=value` flag pre-fills that variable and skips the prompt for it. The wizard only asks for vars that weren't provided.
 
@@ -30,6 +35,8 @@ Explorer maps the codebase, decomposes work into implementer arms with non-overl
 **`--list`.** Shows all available formulas (from `~/.beads/formulas/*.formula.json`) with name + description, then exits. Does not pour or dispatch. Combine with no other flags.
 
 **`--dry-run`.** Runs Steps 1–3 (pick formula, collect vars, pour, `bd graph`, `bd ready`) but stops before dispatching any agents. Useful for validating a new custom formula without burning tokens. Leaves the beads issues in place — the user can continue by running `/spawn --resume {team}`, or tear down with `bd list --status=open | grep {team} | bd close ...`. Print the teardown command at the end of the dry run.
+
+**`--status [team-name]`.** User-facing peek at what's running. Does NOT dispatch, claim, or close anything. With no team name, lists every team that has any open beads issue and a one-line summary per team. With a team name, prints the per-step status and any background `Agent` IDs the orchestrator captured. See "Status command" below for the exact output shape. Safe to run mid-team — meant for the user to check progress without interrupting the orchestrator.
 
 ---
 
@@ -313,6 +320,41 @@ Do NOT re-pour. Proceed directly to Step 5 (orchestrate) using `bd ready` as the
 
 Walk the formula's step DAG. For each ready task:
 
+#### Background vs. foreground per step type
+
+| Step type           | Default mode  | Why                                                              |
+|---------------------|---------------|------------------------------------------------------------------|
+| explorer            | **background** | Read-only; orchestrator parses output after completion notify    |
+| implementer arms    | **background** | Long-running; main session should stay free for the user         |
+| test-writer         | **background** | Long-running; failure surfaces in next dispatch cycle            |
+| code-reviewer       | **background** | Read-only; report parsed after completion                        |
+| codex-reviewer      | **background** | Same as code-reviewer                                            |
+| **judge**           | **foreground** | Verdict drives retry loop — orchestrator must read it inline     |
+| **integrate**       | **foreground** | Touches `main`, pushes, deletes branches — must not run blind    |
+
+`--foreground` on the `/spawn` invocation flips every step to foreground (legacy behavior). `--foreground` is the right choice when debugging a stuck team or when the user wants to watch every dispatch happen synchronously.
+
+When a step runs in background, the `Agent` tool returns an `agentId` immediately and the orchestrator gets a completion notification later. The orchestrator MUST:
+
+1. **Capture the `agentId`** in a per-team map (`{team-name}: {step-id: agentId}`) so `--status` and resume can find it later.
+2. **Not block on the notification** — continue dispatching other ready tasks (parallel arms), or yield to the user, until completion arrives.
+3. **On completion notification**, re-enter the orchestration loop: parse the agent's output (for read-only agents whose side effects you must execute), then check if any further steps are now unblocked.
+4. **On no-completion-after-N-minutes**, do NOT poll aggressively — use `ScheduleWakeup` (delay 600–1200s) to check `bd list --status=in_progress` and see if the agent's beads issue is still claimed. Aggressive polling burns the prompt cache.
+
+#### Failure surfacing in background mode
+
+Foreground errors land directly in the conversation. Background errors do not — the agent finishes and reports its result, but the orchestrator is busy elsewhere. To catch failures:
+
+- **On completion notification**, always inspect the agent's final message for an explicit "Done:" or "FAILED:" line. Implementers conventionally end with `Done: implementer — N files changed.` — if that line is missing OR the message describes an unhandled exception, treat it as a failure.
+- **For implementer arms**, also check `bd show {arm-task-id} --json | jq -r '.status'`. If still `in_progress` after the agent reported done, the agent forgot to close its own beads issue — the orchestrator closes it.
+- **For judge FAIL verdicts** (always foreground, so this is straightforward): reopen the failing arm, relay findings, re-dispatch the arm in background, schedule a wakeup to re-judge.
+
+If the orchestrator is yielding to the user when a failure notification arrives, surface a one-line alert: `⚠ {team}/{step-id} failed — {summary}. Run /spawn --resume {team} to continue.` Do not silently retry without telling the user.
+
+#### Per-task dispatch
+
+For each ready task:
+
 1. **Create the worktree** (if it's a task that needs one):
 
    ```bash
@@ -336,11 +378,11 @@ Walk the formula's step DAG. For each ready task:
    - `agent:<name>` → which subagent to spawn
    - `model:<id>` → which model to use
 
-   Fall back to the agent's frontmatter `model` field if no `model:` label is present.
+   Fall back to the agent's frontmatter `model` field if no `model:` label is present. Apply the foreground/background table above for `run_in_background`.
 
-3. **Judge retry loop** (max 3 attempts): on `VERDICT: FAIL`, reopen the failing arm (`bd reopen {id}`), relay findings verbatim, re-dispatch. Escalate to the user after attempt 3.
+3. **Judge retry loop** (max 3 attempts, foreground): on `VERDICT: FAIL`, reopen the failing arm (`bd reopen {id}`), relay findings verbatim, re-dispatch the arm in background, then schedule a wakeup (1200s) to re-judge once the arm closes. Escalate to the user after attempt 3.
 
-4. **Parallel dispatch**: if multiple tasks in `bd ready` share the same `needs` set, spawn them in a **single message** so they run in parallel.
+4. **Parallel dispatch**: if multiple tasks in `bd ready` share the same `needs` set, spawn them in a **single message** so they run in parallel. With background dispatch, a single message with N `Agent` calls returns N `agentId`s and the main session is freed immediately.
 
 #### Scope bd queries to your root epic
 
@@ -359,18 +401,50 @@ Always filter by root epic before claiming work. Never dispatch a task just beca
 
 #### Dispatch pattern for a single task
 
-Copy this block per task. It claims, dispatches, and closes in sequence — one code block per task, not six:
+**Background dispatch (default for explorer / implementer / test-writer / reviewers):**
 
 ```bash
 ID={task-id}
 bd update "$ID" --claim --status in_progress
-# Dispatch the agent (subagent call goes here, see labels for agent: and model:)
-# On agent success:
-bd close "$ID" --reason "{one-line summary}"
-# On agent failure: `bd update "$ID" --status open` and surface the error
 ```
 
-For read-only agents (explorer, code-reviewer) the orchestrator closes on their behalf after executing their recommended commands.
+```
+# Then call Agent with run_in_background: true. Pseudocode:
+Agent(
+  description="...",
+  subagent_type="<from agent: label>",
+  model="<from model: label or frontmatter>",
+  prompt="<full prompt with worktree, beads ID, files, etc.>",
+  run_in_background=true,
+)
+# → returns agentId immediately. Capture it; do NOT block.
+# → on completion notification, parse output, then:
+#     bd close "$ID" --reason "..."   (for Bash-equipped agents that may have already self-closed — check first)
+#     execute any commands the agent reported (bond_command, etc.)
+#     re-evaluate the orchestration loop for newly-ready work
+```
+
+**Foreground dispatch (judge + integrate):**
+
+```bash
+ID={task-id}
+bd update "$ID" --claim --status in_progress
+# Agent(... run_in_background=false) — orchestrator waits for the verdict
+# On agent success:
+bd close "$ID" --reason "{one-line summary}"
+# On agent failure: bd update "$ID" --status open and surface the error inline
+```
+
+For read-only agents (explorer, code-reviewer) the orchestrator closes the agent's beads issue on its behalf after executing the recommended commands. With background dispatch, this happens in the completion-notification handler, not inline.
+
+**Yielding to the user.** After dispatching all currently-ready background tasks in a single message, the orchestrator's user-facing reply should be a one-line summary of what was kicked off and what the user can do next:
+
+```
+Dispatched: {team}/explorer (background, agentId={short-id}). I'll continue when it returns.
+You can run /spawn --status {team} to peek at progress, or keep working — I'll surface failures here.
+```
+
+This frees the main window without leaving the user wondering whether anything is happening.
 
 #### Read-only agents cannot close their own beads issues or bond children
 
@@ -382,6 +456,8 @@ Some agents (explorer, code-reviewer) ship without the `Bash` tool — they're r
 
 Agents with `Bash` in their tools (implementer, judge, test-writer) can handle their own beads operations and should close their own issues.
 
+**With background dispatch:** the orchestrator does NOT see the agent's report until the completion notification fires. Treat the notification as the trigger to: (a) parse the report, (b) execute any recommended commands, (c) close the agent's beads issue. If the explorer returned `DECOMPOSITION:` with bond commands, run those bonds in the notification handler — only then is the team ready to move to the implement step.
+
 #### CRITICAL: `bd ready` does not surface bonded arms
 
 Once the explorer bonds implementer arms under the root epic, those arms do **not** appear in `bd ready` until the root epic closes (which happens last). `bd ready` will only show the root epic itself and any non-bonded steps.
@@ -390,7 +466,7 @@ This means the orchestrator must:
 
 1. **Track arm IDs from the bond output.** Each `bd mol bond mol-implement-arm ...` prints "Spawned: N issues". Capture the resulting arm task IDs — either from the output or by running `bd list --parent {root-epic-id}` after bonding.
 2. **Dispatch arms by ID directly**, not by polling `bd ready`. Use `bd show {arm-id}` to confirm status before dispatch.
-3. **Poll arm closure**: after dispatching, check each arm's status with `bd show {arm-id}` until all are `closed`. Do not rely on `bd ready` to signal completion.
+3. **Poll arm closure**: after dispatching, check each arm's status with `bd show {arm-id}` until all are `closed`. Do not rely on `bd ready` to signal completion. With background dispatch, prefer the agent completion notification over polling — the notification fires when the agent itself finishes, which is the same moment its beads issue should close. Only fall back to `bd show` polling (via `ScheduleWakeup` at 600–1200s intervals) if a notification was missed or the agent's runtime is unbounded.
 
 #### CRITICAL: wire `waits_for: all-children` as real beads deps after bonding
 
@@ -622,6 +698,58 @@ Always spawn parallel tasks in a single message with multiple Agent tool calls.
 
 ---
 
+## Status command
+
+`/spawn --status [{team}]` is the user-facing peek. It does NOT dispatch, claim, close, or modify anything. It exists so the user can check on a team that's running in the background without interrupting the orchestrator.
+
+**No team name** — list every team that has any open beads issue:
+
+```bash
+TEAMS=$(bd list --status=open --json | jq -r '.[].title' | grep -oE '^\[[^]]+\]' | sort -u | tr -d '[]')
+for t in $TEAMS; do
+  OPEN=$(bd list --status=open --json | jq -r --arg t "[$t]" '[.[] | select(.title | contains($t))] | length')
+  IN_PROGRESS=$(bd list --status=in_progress --json | jq -r --arg t "[$t]" '[.[] | select(.title | contains($t))] | length')
+  BLOCKED=$(bd blocked --json 2>/dev/null | jq -r --arg t "[$t]" '[.[] | select(.title | contains($t))] | length')
+  echo "  $t — $OPEN open, $IN_PROGRESS in_progress, $BLOCKED blocked"
+done
+```
+
+Output shape:
+
+```
+Active teams:
+
+  pyannote-sidecar   — 4 open, 2 in_progress, 0 blocked
+  enroll-ui          — 5 open, 2 in_progress, 1 blocked
+
+Run /spawn --status {team} for per-step detail, or /spawn --resume {team} to continue.
+```
+
+**With a team name** — print per-step status, recent activity, and (if the orchestrator captured them) live `agentId`s:
+
+```bash
+TEAM={team}
+echo "Team: $TEAM"
+echo ""
+echo "Steps:"
+bd list --status=open --json | jq -r --arg t "[$TEAM]" \
+  '.[] | select(.title | contains($t)) | "  ○ \(.id) \(.title) [\(.status)]"'
+bd list --status=in_progress --json | jq -r --arg t "[$TEAM]" \
+  '.[] | select(.title | contains($t)) | "  ◐ \(.id) \(.title) [in_progress]"'
+echo ""
+echo "Worktrees:"
+git worktree list --porcelain | awk '/^worktree / {print $2}' | grep -E "/${TEAM}-[^/]+$" || echo "  (none)"
+echo ""
+echo "Branches:"
+git branch --list "agent/${TEAM}/*" "integration/${TEAM}" | sed 's/^/  /' || echo "  (none)"
+```
+
+If the orchestrator has been tracking background `agentId`s in its scratch state, append a "Background agents" block with the captured IDs and what step each is running. If not, omit that block — don't fabricate it.
+
+**Read-only.** `--status` never writes to beads, never touches git, never dispatches an agent. Safe to run at any time, including while a team is mid-flight.
+
+---
+
 ## Abandoning a team run
 
 `/spawn --abandon {team} [--force]` is the escape hatch for a team run that broke mid-way and the user wants to clean up beads state, worktrees, and branches **without shipping anything**. This is destructive — nothing is preserved beyond what's already been pushed to a remote.
@@ -794,3 +922,6 @@ If the user wants any of those cleaned up, they do it by hand. `--abandon` is in
 - Never skip hooks on the integration commit — only on per-agent commits (`HUSKY=0` or repo equivalent)
 - Resolve conflicts manually during integration — do not discard work
 - Close beads issues only when the work is actually done
+- Default to background dispatch for explorer / implementer / test-writer / reviewer; keep judge + integrate foreground (the table in Step 5 is authoritative)
+- Capture background `agentId`s in per-team scratch state so `--status` and resume can find them
+- Surface background failures to the user as a one-line alert when they fire — do not silently retry without telling the user
